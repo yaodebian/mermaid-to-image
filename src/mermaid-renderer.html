@@ -125,18 +125,36 @@
       log(`收到消息: ${event.data.type}`);
       
       if (event.data.type === 'render-mermaid') {
-        renderMermaid(event.data.code);
+        renderMermaid(event.data.code, event.data.requestId);
       } else if (event.data.type === 'debug-mode') {
         debugMode = event.data.enabled;
         debugPanel.style.display = debugMode ? 'block' : 'none';
         log(`调试模式: ${debugMode ? '开启' : '关闭'}`);
+      } else if (event.data.type === 'clear-mermaid') {
+        // 处理清空请求
+        clearRenderer(event.data.requestId);
       }
     });
 
-    function renderMermaid(code) {
+    // 清空渲染容器
+    function clearRenderer(requestId) {
+      log('清空渲染容器');
+      const container = document.getElementById('container');
+      container.innerHTML = '';
+      
+      // 通知父窗口清空成功
+      window.parent.postMessage({
+        type: 'mermaid-rendered',
+        success: true,
+        cleared: true,
+        requestId: requestId || Date.now()
+      }, '*');
+    }
+
+    function renderMermaid(code, requestId) {
       if (!code || typeof code !== 'string') {
         log('渲染失败: 无效的代码');
-        sendRenderError('无效的Mermaid代码');
+        sendRenderError('无效的Mermaid代码', requestId);
         return;
       }
       
@@ -145,7 +163,7 @@
       
       if (!code) {
         log('跳过渲染: 空代码');
-        sendRenderError('请输入Mermaid代码');
+        clearRenderer(requestId);
         return;
       }
       
@@ -162,7 +180,7 @@
         } catch (parseError) {
           // 如果解析失败，显示详细的语法错误
           log(`解析错误: ${parseError.message}`);
-          showSyntaxError(parseError, code);
+          showSyntaxError(parseError, code, requestId);
           return;
         }
         
@@ -170,50 +188,77 @@
         mermaid.render('mermaid-svg', code)
           .then(result => {
             log('Mermaid渲染成功');
+            container.innerHTML = '';
             container.innerHTML = result.svg;
             
             // 获取SVG元素
             const svg = container.querySelector('svg');
             if (svg) {
+              // 调整SVG大小
+              adjustSvgSize(svg);
+              
               // 发送SVG尺寸信息回父窗口
               window.parent.postMessage({
                 type: 'mermaid-rendered',
                 success: true,
                 width: svg.getBoundingClientRect().width,
-                height: svg.getBoundingClientRect().height
+                height: svg.getBoundingClientRect().height,
+                requestId: requestId
               }, '*');
             } else {
-              sendRenderError('渲染成功但未找到SVG元素');
+              sendRenderError('渲染成功但未找到SVG元素', requestId);
             }
           })
           .catch(err => {
-            showSyntaxError(err, code);
+            showSyntaxError(err, code, requestId);
           });
       } catch (err) {
         // 显示错误消息
-        showSyntaxError(err, code);
+        showSyntaxError(err, code, requestId);
       }
     }
     
-    function sendRenderError(errorMessage) {
+    // 调整SVG大小
+    function adjustSvgSize(svg) {
+      // 确保SVG有适当的大小
+      if (!svg.hasAttribute('width') || svg.getAttribute('width') === '100%' ||
+          !svg.hasAttribute('height') || svg.getAttribute('height') === '100%') {
+        const bbox = svg.getBBox();
+        const padding = 20;
+        svg.setAttribute('width', (bbox.width + padding) + 'px');
+        svg.setAttribute('height', (bbox.height + padding) + 'px');
+      }
+      
+      // 添加样式
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      svg.style.display = 'block';
+      svg.style.margin = '0 auto';
+    }
+    
+    function sendRenderError(errorMessage, requestId) {
       log(`渲染错误: ${errorMessage}`);
       
       // 通知父窗口渲染失败
       window.parent.postMessage({
         type: 'mermaid-rendered',
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        requestId: requestId
       }, '*');
     }
     
-    function showSyntaxError(error, code) {
-      log(`显示语法错误: ${error.message}`);
+    function showSyntaxError(error, code, requestId) {
+      log(`显示语法错误: ${error.message || error}`);
       const container = document.getElementById('container');
       
       // 提取错误行和字符位置
       let errorLine = 'Unknown';
       let errorChar = '';
-      let errorMsg = error.message || '未知错误';
+      let errorMsg = error.message || error || '未知错误';
+      if (typeof errorMsg !== 'string') {
+        errorMsg = '未知错误';
+      }
       
       const lineMatch = errorMsg.match(/Line (\d+)/i);
       if (lineMatch) {
@@ -224,6 +269,9 @@
       if (charMatch) {
         errorChar = `，字符 ${charMatch[1]}`;
       }
+      
+      // 清空容器
+      container.innerHTML = '';
       
       // 创建更友好的错误显示
       const errorDiv = document.createElement('div');
@@ -241,27 +289,27 @@
           codeHighlight = '<div class="error-code">';
           for (let i = startLine; i <= endLine; i++) {
             const isErrorLine = i === parseInt(errorLine);
-            codeHighlight += `<div style="${isErrorLine ? 'background-color:#ffecec;font-weight:bold;' : ''}">${i}: ${lines[i-1]}</div>`;
+            codeHighlight += `<div class="${isErrorLine ? 'error-line' : ''}">${i}: ${lines[i-1] || ''}</div>`;
           }
           codeHighlight += '</div>';
         }
       }
       
       errorDiv.innerHTML = `
-        <div class="error-line">Mermaid语法错误</div>
+        <div style="font-weight: bold; margin-bottom: 8px;">Mermaid语法错误</div>
         <div>错误位置: 第 ${errorLine} 行${errorChar}</div>
         <div>错误信息: ${errorMsg}</div>
         ${codeHighlight}
       `;
       
-      container.innerHTML = '';
       container.appendChild(errorDiv);
       
       // 通知父窗口渲染失败
       window.parent.postMessage({
         type: 'mermaid-rendered',
         success: false,
-        error: `语法错误: 第 ${errorLine} 行${errorChar}`
+        error: `语法错误: 第 ${errorLine} 行${errorChar} - ${errorMsg}`,
+        requestId: requestId
       }, '*');
     }
     

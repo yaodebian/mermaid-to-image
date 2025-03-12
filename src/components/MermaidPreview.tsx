@@ -222,6 +222,14 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   const handleClear = () => {
     setMermaidText('');
     setError(null);
+    
+    // 向iframe发送清空命令
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'clear-mermaid',
+        requestId: Date.now()
+      }, '*');
+    }
   };
 
   // 防抖函数：等待用户停止输入一段时间后再渲染
@@ -230,9 +238,16 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
       clearTimeout(renderTimeoutRef.current);
     }
     
-    // 如果没有文本，清空渲染区域
+    // 如果没有文本，发送清空命令
     if (!text.trim()) {
       setError(null);
+      // 清空渲染区域
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'clear-mermaid',
+          requestId: Date.now()
+        }, '*');
+      }
       return;
     }
     
@@ -583,10 +598,6 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
                     刷新
                   </button>
                 </div>
-                
-                {error && (
-                  <RenderError error={error} code={mermaidText} />
-                )}
                 
                 <iframe
                   ref={iframeRef}

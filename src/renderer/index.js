@@ -297,21 +297,39 @@ import './styles.css';
       codeHighlight += '</div>';
     }
     
-    // 渲染错误信息
-    container.innerHTML = `
-      <div class="error-message">
-        <div style="font-weight: bold; margin-bottom: 8px;">Mermaid语法错误</div>
-        <div>错误位置: 第 ${errorLine} 行${errorChar}</div>
-        <div>错误信息: ${errorMessage}</div>
-        ${codeHighlight}
-      </div>
+    // 清空容器后显示错误信息
+    container.innerHTML = '';
+    
+    // 渲染自定义错误信息
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 8px;">Mermaid语法错误</div>
+      <div>错误位置: 第 ${errorLine} 行${errorChar}</div>
+      <div>错误信息: ${errorMessage}</div>
+      ${codeHighlight}
     `;
+    container.appendChild(errorDiv);
     
     // 通知父窗口渲染失败
     window.parent.postMessage({
       type: 'mermaid-rendered',
       success: false,
       error: `语法错误: 第${errorLine}行${errorChar} - ${errorMessage}`,
+      requestId: requestId
+    }, '*');
+  }
+  
+  // 清空渲染容器
+  function clearContainer(requestId) {
+    log('清空渲染容器');
+    container.innerHTML = '';
+    
+    // 通知父窗口清空成功
+    window.parent.postMessage({
+      type: 'mermaid-rendered',
+      success: true,
+      cleared: true,
       requestId: requestId
     }, '*');
   }
@@ -329,6 +347,11 @@ import './styles.css';
         logContainer.style.display = event.data.enabled ? 'block' : 'none';
         log(`调试模式: ${event.data.enabled ? '开启' : '关闭'}`);
       }
+    } else if (event.data.type === 'clear-mermaid') {
+      // 处理清空渲染请求
+      const requestId = event.data.requestId || Date.now();
+      log(`收到清空请求, ID: ${requestId}`);
+      clearContainer(requestId);
     }
   });
   
