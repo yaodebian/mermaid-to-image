@@ -1,6 +1,108 @@
 # Mermaid to Image Chrome扩展
 
-一个用于预览和提取Mermaid图表的Chrome扩展。
+一个Chrome扩展，用于从网页中提取Mermaid图表并转换为图片。
+
+## 功能特点
+
+- 在网页中预览Mermaid图表
+- 提取网页中的Mermaid语法代码
+- 将Mermaid图表导出为SVG、PNG、JPEG格式
+- 调试模式，便于检查渲染过程和错误信息
+
+## 技术架构
+
+### 核心组件
+
+扩展包含以下主要组件：
+
+1. **弹出界面 (Popup)**: 用于插件控制和功能入口
+2. **内容脚本 (Content Script)**: 注入到网页中，用于提取和显示Mermaid图表
+3. **背景脚本 (Background)**: 处理Chrome API和跨组件通信
+4. **Mermaid渲染器 (Renderer)**: 在沙盒iframe环境中安全渲染Mermaid图表
+
+### 关键技术点
+
+- **React + TypeScript**: 用于构建用户界面
+- **Tailwind CSS**: 提供样式支持
+- **Webpack**: 打包和构建流程管理
+- **Mermaid**: 用于图表渲染的核心库 (v11.4.1)
+- **html-to-image**: 用于图表导出功能
+
+### 安全沙盒设计
+
+为确保安全，Mermaid渲染过程被隔离在沙盒iframe中执行，通过postMessage进行通信，防止潜在的XSS风险。
+
+## 开发与构建
+
+### 环境需求
+
+- Node.js (v16+)
+- npm 或 yarn
+
+### 安装依赖
+
+```bash
+npm install
+# 或
+yarn install
+```
+
+### 开发模式
+
+```bash
+npm run dev
+# 或
+yarn dev
+```
+
+### 生产构建
+
+```bash
+npm run build
+# 或
+yarn build
+```
+
+构建后的文件位于 `dist` 目录中，可直接加载到Chrome扩展中进行测试。
+
+## 项目架构说明
+
+### 文件结构
+
+```
+├── src/
+│   ├── background/         # 背景脚本
+│   ├── components/         # React组件
+│   ├── content/            # 内容脚本
+│   ├── popup/              # 弹窗界面
+│   ├── renderer/           # Mermaid渲染器
+│   └── styles/             # 全局样式
+├── icons/                  # 图标资源
+├── manifest.json           # 扩展清单文件
+├── webpack.config.js       # Webpack配置
+└── package.json            # 项目配置和依赖
+```
+
+### 渲染流程
+
+1. 用户在界面中输入或从网页提取Mermaid语法
+2. 内容被发送到沙盒iframe (mermaid-renderer.html)
+3. 渲染器使用Mermaid库解析和渲染图表
+4. 结果通过postMessage返回给主界面
+5. 用户可以预览并下载渲染好的图表
+
+## 最佳实践与设计原则
+
+- **模块化**: 每个功能都被封装为独立的组件和模块
+- **类型安全**: 使用TypeScript确保代码质量和可维护性
+- **安全第一**: 使用沙盒隔离和CSP策略防止安全风险
+- **性能优化**: 使用延迟加载和防抖技术优化性能
+- **依赖管理**: 所有外部库通过npm集中管理，便于更新和维护
+- **构建优化**: 使用Webpack处理资源打包、代码分割和优化
+
+## 贡献指南
+
+欢迎提交Issues和Pull Requests，共同改进这个项目！
 
 ## 功能
 

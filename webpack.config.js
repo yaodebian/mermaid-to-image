@@ -9,6 +9,7 @@ module.exports = {
     popup: './src/popup/index.tsx',
     content: './src/content/index.ts',
     background: './src/background/index.ts',
+    renderer: './src/renderer/index.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -42,13 +43,15 @@ module.exports = {
       filename: 'popup.html',
       chunks: ['popup'],
     }),
+    new HtmlWebpackPlugin({
+      template: './src/renderer/template.html',
+      filename: 'mermaid-renderer.html',
+      chunks: ['renderer'],
+    }),
     new CopyWebpackPlugin({
       patterns: [
         { from: 'manifest.json', to: '.' },
         { from: 'icons', to: 'icons' },
-        { from: 'public/mermaid-renderer.html', to: 'mermaid-renderer.html' },
-        { from: 'public/mermaid-script.js', to: 'mermaid-script.js' },
-        { from: 'public/mermaid.min.js', to: 'mermaid.min.js' },
       ],
     }),
   ],

@@ -115,6 +115,7 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   const getRendererUrl = (): string => {
     // 尝试使用chrome-extension://协议，确保路径正确
     try {
+      // 此处路径指向webpack生成的mermaid-renderer.html
       return chrome.runtime.getURL("mermaid-renderer.html");
     } catch (e) {
       console.error("无法获取chrome.runtime.getURL", e);
@@ -539,6 +540,10 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
                   </button>
                 </div>
                 
+                {error && (
+                  <RenderError error={error} code={mermaidText} />
+                )}
+                
                 <iframe
                   ref={iframeRef}
                   src={getRendererUrl()}
@@ -575,10 +580,6 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
               <div>正在加载: {isLoading ? '是' : '否'}</div>
               <div>SVG元素存在: {svgRef.current ? '是' : '否'}</div>
             </div>
-          )}
-          
-          {error && (
-            <RenderError error={error} code={mermaidText} />
           )}
         </div>
       </div>

@@ -17,14 +17,14 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'",
-    "sandbox": "sandbox allow-scripts allow-forms allow-popups; script-src 'self'; object-src 'self'"
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self'; object-src 'self'"
   },
   "sandbox": {
     "pages": ["mermaid-renderer.html"]
   },
   "web_accessible_resources": [
     {
-      "resources": ["mermaid-renderer.html", "mermaid-script.js"],
+      "resources": ["mermaid-renderer.html", "renderer.js"],
       "matches": ["<all_urls>"]
     }
   ],
