@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid渲染器</title>
+  <!-- 使用本地Mermaid库 -->
+  <script src="mermaid.min.js"></script>
+  <!-- 使用内置的mermaid库，而不是CDN -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/mermaid@10.8.0/dist/mermaid.min.js"></script> -->
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: transparent;
+    }
+    #container {
+      padding: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .error-message {
+      color: #e53e3e;
+      padding: 12px;
+      border: 1px solid #feb2b2;
+      background-color: #fff5f5;
+      border-radius: 4px;
+      margin: 10px 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      font-size: 14px;
+    }
+    #log-container {
+      margin-top: 20px;
+      border-top: 1px dashed #ccc;
+      padding-top: 10px;
+      font-size: 12px;
+      color: #666;
+      display: none;
+      max-height: 200px;
+      overflow-y: auto;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      padding: 8px;
+    }
+    .log-entry {
+      margin: 2px 0;
+      padding: 2px 0;
+      border-bottom: 1px dotted #eee;
+    }
+    .log-error {
+      color: #e53e3e;
+      font-weight: bold;
+    }
+    .loading {
+      color: #4a5568;
+      text-align: center;
+      padding: 20px;
+      font-size: 14px;
+    }
+    
+    /* 美化SVG渲染 */
+    #container svg {
+      max-width: 100%;
+      height: auto !important;
+      display: block;
+      margin: 0 auto;
+    }
+    
+    /* 错误代码格式化 */
+    .error-code {
+      background-color: #f8f9fa;
+      border: 1px solid #eaecef;
+      border-radius: 3px;
+      font-family: SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
+      font-size: 12px;
+      padding: 8px;
+      margin-top: 8px;
+      overflow: auto;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .error-line {
+      background-color: #ffecec;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="loading">准备渲染...</div>
+  </div>
+  <div id="log-container"></div>
+
+  <!-- 使用外部脚本文件替代内联脚本 -->
+  <script src="mermaid-script.js"></script>
+</body>
+</html> 

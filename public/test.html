@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid测试页面</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .example {
+      margin-bottom: 30px;
+      padding: 20px;
+      border: 1px solid #eee;
+      border-radius: 5px;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mermaid图表测试页面</h1>
+  <p>这个页面包含多个Mermaid图表示例，用于测试Mermaid to Image扩展。</p>
+
+  <div class="example">
+    <h2>流程图示例</h2>
+    <pre class="mermaid-source">
+graph TD
+    A[开始] --> B{是否满足条件?}
+    B -->|是| C[处理]
+    B -->|否| D[跳过]
+    C --> E[结束]
+    D --> E
+    </pre>
+    <div class="mermaid">
+graph TD
+    A[开始] --> B{是否满足条件?}
+    B -->|是| C[处理]
+    B -->|否| D[跳过]
+    C --> E[结束]
+    D --> E
+    </div>
+  </div>
+
+  <div class="example">
+    <h2>时序图示例</h2>
+    <pre class="mermaid-source">
+sequenceDiagram
+    participant 客户端
+    participant 服务器
+    客户端->>服务器: 请求数据
+    服务器-->>客户端: 响应数据
+    客户端->>服务器: 发送更新
+    服务器-->>客户端: 确认更新
+    </pre>
+    <div class="mermaid">
+sequenceDiagram
+    participant 客户端
+    participant 服务器
+    客户端->>服务器: 请求数据
+    服务器-->>客户端: 响应数据
+    客户端->>服务器: 发送更新
+    服务器-->>客户端: 确认更新
+    </div>
+  </div>
+
+  <div class="example">
+    <h2>类图示例</h2>
+    <pre class="mermaid-source">
+classDiagram
+    class Animal {
+        +name: string
+        +age: int
+        +makeSound()
+    }
+    class Dog {
+        +breed: string
+        +bark()
+    }
+    class Cat {
+        +color: string
+        +meow()
+    }
+    Animal <|-- Dog
+    Animal <|-- Cat
+    </pre>
+    <div class="mermaid">
+classDiagram
+    class Animal {
+        +name: string
+        +age: int
+        +makeSound()
+    }
+    class Dog {
+        +breed: string
+        +bark()
+    }
+    class Cat {
+        +color: string
+        +meow()
+    }
+    Animal <|-- Dog
+    Animal <|-- Cat
+    </div>
+  </div>
+
+  <div class="example">
+    <h2>甘特图示例</h2>
+    <pre class="mermaid-source">
+gantt
+    title 项目时间表
+    dateFormat  YYYY-MM-DD
+    section 设计
+    需求分析       :a1, 2023-01-01, 7d
+    UI设计     :after a1, 10d
+    section 开发
+    编码       :2023-01-15, 15d
+    测试       :2023-02-01, 10d
+    section 部署
+    发布上线       :2023-02-15, 5d
+    </pre>
+    <div class="mermaid">
+gantt
+    title 项目时间表
+    dateFormat  YYYY-MM-DD
+    section 设计
+    需求分析       :a1, 2023-01-01, 7d
+    UI设计     :after a1, 10d
+    section 开发
+    编码       :2023-01-15, 15d
+    测试       :2023-02-01, 10d
+    section 部署
+    发布上线       :2023-02-15, 5d
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default'
+    });
+  </script>
+</body>
+</html> 

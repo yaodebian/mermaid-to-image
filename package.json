@@ -1,0 +1,43 @@
+{
+  "name": "mermaid-to-image",
+  "version": "1.0.0",
+  "description": "Chrome插件，用于预览Mermaid文本和提取网页中的Mermaid图表",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "watch": "webpack --watch --config webpack.config.js",
+    "dev": "webpack --mode development",
+    "prod": "webpack --mode production"
+  },
+  "keywords": [
+    "mermaid",
+    "chrome-extension",
+    "diagram",
+    "image"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.254",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.17",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.8.1",
+    "html-webpack-plugin": "^5.5.4",
+    "postcss": "^8.4.32",
+    "postcss-loader": "^7.3.3",
+    "postcss-preset-env": "^9.3.0",
+    "style-loader": "^3.3.3",
+    "tailwindcss": "^3.3.6",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.11",
+    "mermaid": "^11.4.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+} 
