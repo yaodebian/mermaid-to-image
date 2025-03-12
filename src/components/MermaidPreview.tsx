@@ -110,6 +110,7 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   const svgRef = useRef<SVGElement | null>(null);
   const isIframeLoaded = useRef<boolean>(false);
   const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [svgDimensions, setSvgDimensions] = useState<{width: number, height: number} | null>(null);
   
   // 使用绝对路径加载iframe
   const getRendererUrl = (): string => {
@@ -151,7 +152,16 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
         enabled: true
       }, '*');
     }
-  }, [debugMode]);
+    
+    // 设置安全超时，如果长时间没有收到渲染完成消息，自动关闭加载状态
+    setTimeout(() => {
+      // 如果还处于加载状态，认为是渲染卡住了
+      if (isLoading) {
+        console.log('渲染超时，自动关闭加载状态');
+        setIsLoading(false);
+      }
+    }, 5000); // 5秒超时
+  }, [debugMode, isLoading]);
 
   // 监听来自iframe的消息
   useEffect(() => {
@@ -165,6 +175,14 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
         
         if (event.data.success) {
           setError(null);
+          
+          // 保存SVG尺寸信息用于自适应高度
+          if (event.data.width && event.data.height) {
+            setSvgDimensions({
+              width: event.data.width,
+              height: event.data.height
+            });
+          }
           
           // 通过iframe的contentDocument获取SVG元素
           if (iframeRef.current && iframeRef.current.contentDocument) {
@@ -198,7 +216,7 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [mermaidText]);
+  }, []);
 
   // 清空编辑框
   const handleClear = () => {
@@ -220,6 +238,7 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
     
     // 延迟300ms再渲染，减少频繁渲染
     renderTimeoutRef.current = setTimeout(() => {
+      console.log('执行延迟渲染', text.substring(0, 20) + '...');
       renderMermaid(text);
     }, 300);
   }, []);
@@ -235,13 +254,23 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
     }
     
     setIsLoading(true);
-    console.log('发送Mermaid代码到iframe', code);
+    console.log('发送Mermaid代码到iframe', code.length + '字符');
+    
+    // 设置渲染超时保护
+    const renderTimeout = setTimeout(() => {
+      console.warn('渲染操作超时');
+      setIsLoading(false);
+    }, 10000); // 10秒后如果没有响应，自动关闭加载状态
     
     // 向iframe发送消息，请求渲染Mermaid
     iframeRef.current.contentWindow.postMessage({
       type: 'render-mermaid',
-      code: code
+      code: code,
+      requestId: Date.now() // 添加请求ID便于调试
     }, '*');
+    
+    // 清除之前的超时
+    return () => clearTimeout(renderTimeout);
   }, []);
 
   // 强制重新渲染当前图表
@@ -253,11 +282,22 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
 
   // 当文本改变时渲染新的Mermaid文本
   useEffect(() => {
-    console.log('文本变化', { mermaidText });
-    if (isIframeLoaded.current && rendererStatus === '就绪') {
+    console.log('文本变化', { length: mermaidText.length, status: rendererStatus, loaded: isIframeLoaded.current });
+    
+    // 即使状态不是就绪，也尝试渲染，因为iframe可能已经准备好但没有通知
+    if (isIframeLoaded.current) {
+      // 如果状态不是就绪，也允许渲染，只要iframe已加载
       debouncedRender(mermaidText);
     }
-  }, [mermaidText, debouncedRender, rendererStatus]);
+  }, [mermaidText, debouncedRender]);
+
+  // 额外添加一个useEffect以便在iframe加载完成后立即渲染当前文本
+  useEffect(() => {
+    if (isIframeLoaded.current && mermaidText.trim()) {
+      console.log('iframe已加载，立即渲染当前文本');
+      renderMermaid(mermaidText);
+    }
+  }, [isIframeLoaded.current]); // 依赖于isIframeLoaded.current的变化
 
   // 清理副作用
   useEffect(() => {
@@ -521,12 +561,16 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
             </div>
           </div>
           
-          <div className="flex-1 relative min-h-[200px] mt-2">
+          <div className="flex-1 relative mt-2">
             <div 
-              className="bg-white border border-gray-300 rounded-md p-3 h-full overflow-auto"
+              className="bg-white border border-gray-300 rounded-md p-3 overflow-auto"
               ref={previewRef}
+              style={{ 
+                minHeight: '250px',
+                maxHeight: '600px' // 添加最大高度限制
+              }}
             >
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium text-gray-700">
                     渲染预览{rendererStatus !== '就绪' ? ` - ${rendererStatus}` : ''}
@@ -549,9 +593,13 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
                   src={getRendererUrl()}
                   style={{
                     width: '100%',
-                    height: isLoading || error ? '200px' : '100%',
+                    height: svgDimensions 
+                      ? `${Math.min(svgDimensions.height + 40, 550)}px` // 根据SVG高度自适应，并设置上限
+                      : isLoading || error ? '250px' : '400px', // 默认高度
                     border: 'none',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    transition: 'height 0.3s ease', // 平滑过渡
+                    backgroundColor: '#fff'
                   }}
                   sandbox="allow-scripts allow-same-origin allow-downloads"
                   onLoad={handleIframeLoad}
@@ -579,6 +627,8 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
               <div>已加载iframe: {isIframeLoaded.current ? '是' : '否'}</div>
               <div>正在加载: {isLoading ? '是' : '否'}</div>
               <div>SVG元素存在: {svgRef.current ? '是' : '否'}</div>
+              <div>错误状态: {error ? '是' : '否'}</div>
+              {error && <div>错误信息: {error}</div>}
             </div>
           )}
         </div>

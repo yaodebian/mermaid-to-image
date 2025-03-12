@@ -5,15 +5,70 @@ const Popup: React.FC = () => {
 
   const handlePreviewClick = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id!, { action: 'openPreview' });
-      window.close();
+      if (!tabs[0]?.id) {
+        console.error('无法获取当前标签页ID');
+        return;
+      }
+      
+      try {
+        // 发送消息并监听响应
+        chrome.tabs.sendMessage(
+          tabs[0].id, 
+          { action: 'openPreview' },
+          (response) => {
+            // 检查响应是否成功
+            if (chrome.runtime.lastError) {
+              console.error('发送消息时出错:', chrome.runtime.lastError);
+              // 可能内容脚本未注入，尝试注入内容脚本
+              // 这里可以添加额外的错误处理逻辑
+            } else if (!response?.success) {
+              console.error('预览打开失败:', response?.error || '未知错误');
+            } else {
+              console.log('预览已打开');
+            }
+            
+            // 无论如何都关闭弹出窗口
+            window.close();
+          }
+        );
+      } catch (error) {
+        console.error('发送openPreview消息时出错:', error);
+        window.close();
+      }
     });
   };
 
   const handleExtractClick = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id!, { action: 'extractMermaid' });
-      window.close();
+      if (!tabs[0]?.id) {
+        console.error('无法获取当前标签页ID');
+        return;
+      }
+      
+      try {
+        // 发送消息并监听响应
+        chrome.tabs.sendMessage(
+          tabs[0].id, 
+          { action: 'extractMermaid' },
+          (response) => {
+            // 检查响应是否成功
+            if (chrome.runtime.lastError) {
+              console.error('发送消息时出错:', chrome.runtime.lastError);
+              // 可能内容脚本未注入，尝试注入内容脚本
+            } else if (!response?.success) {
+              console.error('提取打开失败:', response?.error || '未知错误');
+            } else {
+              console.log('提取已打开');
+            }
+            
+            // 无论如何都关闭弹出窗口
+            window.close();
+          }
+        );
+      } catch (error) {
+        console.error('发送extractMermaid消息时出错:', error);
+        window.close();
+      }
     });
   };
 
