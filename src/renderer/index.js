@@ -12,6 +12,34 @@ import './styles.css';
   let mermaidVersion = 'unknown';
   let attemptCount = 0;
   
+  // 创建并添加自定义样式，隐藏官方错误视图
+  function addCustomStyles() {
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+      /* 隐藏Mermaid官方错误视图 */
+      .mermaid:not(#container) {
+        display: none !important;
+      }
+      [id^="mermaid-error-"] {
+        display: none !important;
+      }
+      .mermaid .error {
+        display: none !important;
+      }
+      .mermaid-error {
+        display: none !important;
+      }
+      /* 确保其他内联样式不会干扰我们的错误显示 */
+      #container > *:not(.error-message):not(svg) {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }
+  
+  // 初始化后立即添加自定义样式
+  addCustomStyles();
+  
   // 日志函数
   function log(message, isError = false) {
     console[isError ? 'error' : 'log'](`[Mermaid渲染器] ${message}`);
@@ -127,6 +155,9 @@ import './styles.css';
             // 确保SVG有合适的尺寸和样式
             adjustSvgSize(svgElement);
             
+            // 隐藏可能存在的错误视图
+            hideErrorElements();
+            
             // 通知父窗口渲染成功
             notifySuccess(svgElement, requestId);
           })
@@ -156,6 +187,9 @@ import './styles.css';
               // 确保SVG尺寸正确
               adjustSvgSize(svgElement);
               
+              // 隐藏可能存在的错误视图
+              hideErrorElements();
+              
               log('备用渲染成功');
               notifySuccess(svgElement, requestId);
             } catch (backupError) {
@@ -184,6 +218,22 @@ import './styles.css';
         requestId: requestId
       }, '*');
     }
+  }
+  
+  // 隐藏所有可能的错误元素
+  function hideErrorElements() {
+    // 隐藏所有可能的错误元素
+    const errorElements = document.querySelectorAll('[id^="mermaid-error-"], .mermaid .error, .mermaid-error');
+    errorElements.forEach(el => {
+      el.style.display = 'none';
+    });
+    
+    // 仅保留我们自己创建的元素和SVG
+    Array.from(container.children).forEach(child => {
+      if (!child.classList.contains('error-message') && child.tagName.toLowerCase() !== 'svg') {
+        child.style.display = 'none';
+      }
+    });
   }
   
   // 调整SVG大小
@@ -297,10 +347,10 @@ import './styles.css';
       codeHighlight += '</div>';
     }
     
-    // 清空容器后显示错误信息
+    // 先完全清空容器，确保没有旧内容或错误视图存在
     container.innerHTML = '';
     
-    // 渲染自定义错误信息
+    // 渲染自定义错误信息，不使用mermaid的默认错误视图
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
     errorDiv.innerHTML = `
@@ -310,6 +360,9 @@ import './styles.css';
       ${codeHighlight}
     `;
     container.appendChild(errorDiv);
+    
+    // 立即执行一次清理，确保不会显示官方错误视图
+    setTimeout(hideErrorElements, 0);
     
     // 通知父窗口渲染失败
     window.parent.postMessage({
