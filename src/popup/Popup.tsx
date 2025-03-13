@@ -93,7 +93,7 @@ const Popup: React.FC = () => {
 
       {activeTab === 'preview' && (
         <div>
-          <p className="text-sm mb-4">打开浮层预览Mermaid并下载图像</p>
+          <p className="text-sm mb-4">在新窗口中打开Mermaid预览编辑器并可下载图像</p>
           <button 
             className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
             onClick={handlePreviewClick}
@@ -116,7 +116,7 @@ const Popup: React.FC = () => {
       )}
 
       <div className="mt-4 text-xs text-gray-500 text-center">
-        双击浮层标题栏以折叠/展开
+        提示：选中页面中的Mermaid代码后再点击预览按钮可自动填充
       </div>
     </div>
   );

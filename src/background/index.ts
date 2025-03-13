@@ -29,5 +29,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
     });
     return true; // 将会异步发送响应
+  } else if (message.action === 'openTab') {
+    // 处理打开新标签页的请求
+    try {
+      chrome.tabs.create({ url: message.url }, (tab) => {
+        console.log('已打开Mermaid预览标签页', tab.id);
+        if (sendResponse) {
+          sendResponse({ success: true, tabId: tab.id });
+        }
+      });
+    } catch (error) {
+      console.error('打开标签页失败:', error);
+      if (sendResponse) {
+        sendResponse({ success: false, error: String(error) });
+      }
+    }
+    return true; // 将会异步发送响应
   }
 }); 

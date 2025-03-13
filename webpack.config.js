@@ -10,6 +10,7 @@ module.exports = {
     content: './src/content/index.ts',
     background: './src/background/index.ts',
     renderer: './src/renderer/index.js',
+    preview: './src/preview/index.tsx',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -47,6 +48,11 @@ module.exports = {
       template: './src/renderer/template.html',
       filename: 'mermaid-renderer.html',
       chunks: ['renderer'],
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/preview/index.html',
+      filename: 'preview.html',
+      chunks: ['preview'],
     }),
     new CopyWebpackPlugin({
       patterns: [

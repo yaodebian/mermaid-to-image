@@ -20,7 +20,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   try {
     if (message.action === 'openPreview') {
-      showPreviewLayer();
+      // 改为打开新窗口
+      openPreviewInNewTab();
       // 发送成功响应
       sendResponse({ success: true });
     } else if (message.action === 'extractMermaid') {
@@ -38,41 +39,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// 创建预览浮层
-const showPreviewLayer = () => {
-  console.log('显示预览浮层');
-  
-  // 清理已存在的浮层
-  cleanupExistingLayer();
+// 在新标签页中打开预览页面
+const openPreviewInNewTab = () => {
+  console.log('在新标签页中打开预览');
   
   try {
-    // 创建新的浮层
-    floatingContainer = createFloatingContainer('Mermaid预览');
+    // 获取插件中preview.html的URL
+    const previewUrl = chrome.runtime.getURL('preview.html');
     
-    // 渲染预览组件
-    if (floatingContainer) {
-      console.log('创建预览浮层容器成功');
-      
-      // 创建React根元素
-      const root = createRoot(floatingContainer);
-      reactRoot = root;
-      
-      // 渲染预览组件
-      root.render(
-        React.createElement(renderPreviewLayer, {
-          onClose: cleanupFloatingContainer
-        })
-      );
-      
-      console.log('预览组件渲染完成');
-    } else {
-      console.error('创建浮层容器失败');
+    // 获取当前选中的文本，如果有的话
+    const selectedText = window.getSelection()?.toString() || '';
+    
+    // 如果有选中的文本且看起来像是Mermaid语法，则将其作为参数传递
+    let finalUrl = previewUrl;
+    if (selectedText && isMermaidSyntax(selectedText)) {
+      const encodedText = encodeURIComponent(selectedText);
+      finalUrl = `${previewUrl}?code=${encodedText}`;
     }
+    
+    // 在新标签页中打开预览页面
+    chrome.runtime.sendMessage({
+      action: 'openTab',
+      url: finalUrl
+    });
+    
+    console.log('预览页面打开请求已发送');
   } catch (error) {
-    console.error('显示预览浮层时出错:', error);
-    // 确保清理任何部分创建的资源
-    cleanupExistingLayer();
+    console.error('打开预览标签页时出错:', error);
   }
+};
+
+// 简单判断文本是否可能是Mermaid语法
+const isMermaidSyntax = (text: string): boolean => {
+  const trimmedText = text.trim();
+  const mermaidPatterns = [
+    /^graph\s+[A-Za-z0-9_]+/i,
+    /^sequenceDiagram/i,
+    /^classDiagram/i,
+    /^stateDiagram/i,
+    /^erDiagram/i,
+    /^gantt/i,
+    /^pie/i,
+    /^flowchart\s+[A-Za-z0-9_]+/i,
+    /^journey/i,
+    /^gitGraph/i
+  ];
+  
+  return mermaidPatterns.some(pattern => pattern.test(trimmedText));
 };
 
 // 创建提取浮层
