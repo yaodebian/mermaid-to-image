@@ -1,11 +1,11 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import PopupApp from './PopupApp';
+import SidebarApp from './SidebarApp';
 import '../styles/tailwind.css';
 
 /**
- * 弹出窗口入口文件
- * 渲染插件弹出窗口
+ * 侧边栏入口文件
+ * 当侧边栏页面加载时，渲染SidebarApp组件到根DOM元素
  */
 document.addEventListener('DOMContentLoaded', () => {
   const rootElement = document.getElementById('root');
@@ -14,10 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const root = createRoot(rootElement);
     root.render(
       <React.StrictMode>
-        <PopupApp />
+        <SidebarApp />
       </React.StrictMode>
     );
   } else {
-    console.error('找不到根DOM元素');
+    console.error('找不到root DOM元素，无法渲染侧边栏应用');
   }
 }); 

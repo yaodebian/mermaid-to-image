@@ -11,6 +11,8 @@ module.exports = {
     background: './src/background/index.ts',
     renderer: './src/renderer/index.jsx',
     preview: './src/preview/index.tsx',
+    sidebar: './src/sidebar/index.tsx',
+    converter: './src/converter/index.tsx'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -68,19 +70,31 @@ module.exports = {
       template: './src/popup/index.html',
       filename: 'popup.html',
       chunks: ['popup'],
-      inject: false
+      inject: 'body'
     }),
     new HtmlWebpackPlugin({
       template: './src/renderer/template.html',
       filename: 'mermaid-renderer.html',
       chunks: ['renderer'],
-      inject: false
+      inject: 'body'
     }),
     new HtmlWebpackPlugin({
       template: './src/preview/index.html',
       filename: 'preview.html',
       chunks: ['preview'],
-      inject: false
+      inject: 'body'
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/sidebar/index.html',
+      filename: 'sidebar.html',
+      chunks: ['sidebar'],
+      inject: 'body'
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/converter/index.html',
+      filename: 'converter.html',
+      chunks: ['converter'],
+      inject: 'body'
     }),
     new CopyWebpackPlugin({
       patterns: [

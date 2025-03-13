@@ -2,11 +2,20 @@ import '../styles/tailwind.css';
 import { createRoot } from 'react-dom/client';
 import React from 'react';
 import { renderPreviewLayer, renderExtractLayer } from './renderUtils';
+import { detectMermaidDiagrams } from '../services/diagram-detector';
+import { DetectionResult } from '../types/diagram';
+import { MermaidChart } from '../types';
+import { DiagramDetectionService } from '../services/DiagramDetectionService';
 
 // 用于保存浮层的根元素
 let floatingContainer: HTMLElement | null = null;
 let overlayElement: HTMLElement | null = null;
 let reactRoot: ReturnType<typeof createRoot> | null = null;
+
+/**
+ * 存储检测到的图表
+ */
+let detectedCharts: MermaidChart[] = [];
 
 // 阻止事件冒泡和默认行为
 const preventSimpleEvents = (e: Event) => {
@@ -28,6 +37,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       showExtractLayer();
       // 发送成功响应
       sendResponse({ success: true });
+    } else if (message.action === 'detectMermaidDiagrams') {
+      console.log('[Mermaid提取器] 开始检测Mermaid图表');
+      handleDetectDiagrams()
+        .then((result) => {
+          console.log(`[Mermaid提取器] 检测完成，找到 ${result.diagrams.length} 个图表`);
+          sendResponse(result);
+        })
+        .catch((error) => {
+          console.error('[Mermaid提取器] 检测出错:', error);
+          sendResponse({ 
+            success: false, 
+            diagrams: [], 
+            error: error instanceof Error ? error.message : '未知错误' 
+          });
+        });
+      // 返回true表示将异步发送响应
+      return true;
+    } else if (message.type === 'DETECT_CHARTS') {
+      detectDiagrams().then(charts => {
+        sendResponse({ charts });
+      });
+      return true; // 异步响应
     }
   } catch (error) {
     console.error('处理消息时出错:', error);
@@ -38,6 +69,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 返回true表示将异步发送响应
   return true;
 });
+
+/**
+ * 处理检测Mermaid图表的请求
+ */
+async function handleDetectDiagrams(): Promise<DetectionResult> {
+  try {
+    // 检测页面中的Mermaid图表
+    const result = await detectMermaidDiagrams();
+    
+    // 返回检测结果
+    return result;
+  } catch (error) {
+    console.error('[Mermaid提取器] 检测过程出错:', error);
+    return {
+      success: false,
+      diagrams: [],
+      error: error instanceof Error ? error.message : '未知错误'
+    };
+  }
+}
 
 // 在新标签页中打开预览页面
 const openPreviewInNewTab = () => {
@@ -234,81 +285,211 @@ function createFloatingContainer(title: string = 'Mermaid') {
       if (isCollapsed) {
         contentArea.style.display = 'none';
         container.style.height = 'auto';
-        container.style.maxHeight = 'none';
       } else {
         contentArea.style.display = 'block';
         container.style.height = '85%';
-        container.style.maxHeight = '700px';
       }
     });
     
+    // 防止内部元素的事件触发外部事件
+    preventAllEvents(container);
+    
     return contentArea;
   } catch (error) {
-    console.error('创建浮动容器时出错:', error);
+    console.error('创建浮动容器出错:', error);
     return null;
   }
 }
 
-// 阻止事件穿透
+// 防止所有事件传播
 function preventAllEvents(element: HTMLElement) {
-  const events = ['click', 'mousedown', 'mouseup', 'mousemove', 'touchstart', 
-                 'touchend', 'touchmove', 'wheel', 'scroll'];
-  
-  events.forEach(eventType => {
-    element.addEventListener(eventType, preventSimpleEvents, { passive: false });
+  const events = ['click', 'mousedown', 'mouseup', 'keydown', 'keyup', 'touchstart', 'touchend', 'wheel'];
+  events.forEach(event => {
+    element.addEventListener(event, preventSimpleEvents, { capture: true });
   });
 }
 
 // 清理浮动容器
 function cleanupFloatingContainer() {
-  console.log('开始清理浮动容器');
+  console.log('清理浮动容器');
   
-  try {
-    if (reactRoot) {
-      console.log('卸载React根组件');
+  // 卸载React组件
+  if (reactRoot) {
+    try {
       reactRoot.unmount();
       reactRoot = null;
+    } catch (error) {
+      console.error('卸载React组件出错:', error);
     }
-    
-    if (floatingContainer) {
-      console.log('移除浮动容器');
-      
-      try {
-        // 查找父元素（整个容器）
-        const containerParent = floatingContainer.parentElement;
-        if (containerParent) {
-          document.body.removeChild(containerParent);
-        } else {
-          console.error('找不到浮动容器的父元素');
-        }
-      } catch (e) {
-        console.error('移除浮动容器时出错:', e);
-      }
-      
-      floatingContainer = null;
-    }
-    
-    if (overlayElement) {
-      console.log('移除遮罩层');
-      try {
-        document.body.removeChild(overlayElement);
-      } catch (e) {
-        console.error('移除遮罩层时出错:', e);
-      }
-      overlayElement = null;
-    }
-    
-    console.log('浮动容器清理完成');
-  } catch (error) {
-    console.error('清理浮动容器时出错:', error);
+  }
+  
+  // 移除遮罩层
+  if (overlayElement && overlayElement.parentNode) {
+    overlayElement.parentNode.removeChild(overlayElement);
+    overlayElement = null;
+  }
+  
+  // 移除浮动容器
+  if (floatingContainer && floatingContainer.parentNode) {
+    floatingContainer.parentNode.removeChild(floatingContainer.parentNode);
+    floatingContainer = null;
   }
 }
 
-// 清理现有浮层
+// 清理已存在的浮层
 const cleanupExistingLayer = () => {
-  if (floatingContainer || overlayElement) {
-    cleanupFloatingContainer();
-  }
+  console.log('清理已存在的浮层');
+  
+  cleanupFloatingContainer();
 };
 
-console.log('Mermaid to Image: 内容脚本已加载'); 
+// 通知后台脚本内容脚本已加载
+chrome.runtime.sendMessage({ action: 'contentScriptLoaded' });
+
+console.log('Mermaid to Image: 内容脚本已加载');
+
+/**
+ * 初始化内容脚本
+ */
+function init() {
+  console.log('Mermaid图表提取器: 内容脚本已加载');
+  
+  // 页面完全加载后执行检测
+  if (document.readyState === 'complete') {
+    detectDiagrams();
+  } else {
+    window.addEventListener('load', () => {
+      detectDiagrams();
+    });
+  }
+  
+  // 监听DOM变化，可能有新的图表添加
+  observeDOMChanges();
+}
+
+/**
+ * 检测页面中的Mermaid图表
+ */
+async function detectDiagrams(): Promise<MermaidChart[]> {
+  // 清空之前的结果
+  detectedCharts = [];
+  
+  // 查找所有可能包含Mermaid图表的元素
+  const potentialElements = [
+    ...document.querySelectorAll('pre code'),          // 代码块
+    ...document.querySelectorAll('.mermaid'),          // 带有mermaid类的元素
+    ...document.querySelectorAll('[data-diagram-source]')  // 带有data-diagram-source属性的元素
+  ];
+  
+  // 遍历元素并检测
+  for (const element of potentialElements) {
+    const parentElement = element.tagName === 'CODE' ? element.parentElement! : element;
+    const mermaidCode = DiagramDetectionService.detectMermaidFromElement(parentElement);
+    
+    if (mermaidCode) {
+      const chartId = DiagramDetectionService.generateChartId(mermaidCode);
+      
+      // 检查是否已经存在相同ID的图表
+      if (!detectedCharts.some(chart => chart.id === chartId)) {
+        // 获取元素位置信息
+        const rect = parentElement.getBoundingClientRect();
+        const location = {
+          selector: getElementPath(parentElement),
+          position: {
+            top: rect.top + window.scrollY,
+            left: rect.left + window.scrollX
+          }
+        };
+        
+        // 添加到检测结果
+        detectedCharts.push({
+          id: chartId,
+          code: mermaidCode,
+          location
+        });
+      }
+    }
+  }
+  
+  // 如果检测到图表，通知后台
+  if (detectedCharts.length > 0) {
+    chrome.runtime.sendMessage({
+      type: 'CHARTS_DETECTED',
+      count: detectedCharts.length
+    });
+  }
+  
+  return detectedCharts;
+}
+
+/**
+ * 获取元素的CSS选择器路径
+ * @param element DOM元素
+ * @returns 元素的CSS选择器路径
+ */
+function getElementPath(element: Element): string {
+  const path: string[] = [];
+  let currentElement: Element | null = element;
+  
+  while (currentElement && currentElement !== document.documentElement) {
+    let selector = currentElement.tagName.toLowerCase();
+    
+    if (currentElement.id) {
+      selector += `#${currentElement.id}`;
+      path.unshift(selector);
+      break;
+    } else {
+      const siblings = Array.from(currentElement.parentElement?.children || []);
+      
+      if (siblings.length > 1) {
+        const index = siblings.indexOf(currentElement);
+        selector += `:nth-child(${index + 1})`;
+      }
+      
+      path.unshift(selector);
+      currentElement = currentElement.parentElement;
+    }
+  }
+  
+  return path.join(' > ');
+}
+
+/**
+ * 监视DOM变化，检测新增的图表
+ */
+function observeDOMChanges() {
+  const observer = new MutationObserver((mutations) => {
+    let shouldRedetect = false;
+    
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length) {
+        shouldRedetect = true;
+        break;
+      }
+    }
+    
+    if (shouldRedetect) {
+      // 延迟执行，避免频繁检测
+      setTimeout(() => {
+        detectDiagrams().then(charts => {
+          if (charts.length > 0) {
+            // 通知其他组件（如侧边栏）图表列表已更新
+            chrome.runtime.sendMessage({
+              type: 'MERMAID_CHARTS_UPDATED',
+              charts
+            });
+          }
+        });
+      }, 500);
+    }
+  });
+  
+  // 开始观察
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
+// 启动内容脚本
+init(); 

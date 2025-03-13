@@ -1,11 +1,11 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import PopupApp from './PopupApp';
+import ConverterApp from './ConverterApp';
 import '../styles/tailwind.css';
 
 /**
- * 弹出窗口入口文件
- * 渲染插件弹出窗口
+ * 转换器页面入口文件
+ * 当页面加载时，渲染ConverterApp组件到根DOM元素
  */
 document.addEventListener('DOMContentLoaded', () => {
   const rootElement = document.getElementById('root');
@@ -14,10 +14,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const root = createRoot(rootElement);
     root.render(
       <React.StrictMode>
-        <PopupApp />
+        <ConverterApp />
       </React.StrictMode>
     );
   } else {
-    console.error('找不到根DOM元素');
+    console.error('找不到root DOM元素，无法渲染转换器应用');
   }
 }); 
