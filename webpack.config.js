@@ -1,7 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const webpack = require('webpack');
 
 module.exports = {
   mode: 'production',
@@ -20,12 +19,9 @@ module.exports = {
   },
   optimization: {
     minimize: true,
-    moduleIds: 'deterministic',
-    runtimeChunk: false,
     splitChunks: {
       chunks: 'async',
       minSize: 500000,
-      maxSize: 1000000,
       cacheGroups: {
         default: false,
         defaultVendors: false,
