@@ -1,42 +1,115 @@
-# Mermaid预览与提取Chrome插件 - 进度文档
+# Mermaid图表提取与转换 Chrome插件 - 进度文档
 
-## 开发进度跟踪
+## 当前完成情况
 
-### 阶段一：基础结构搭建 (已完成)
-- [x] 创建项目结构
-- [x] 配置manifest.json
-- [x] 设置基本build流程
-- [x] 实现插件popup基础UI
-- [x] 创建项目文档
+### 已完成功能
 
-### 阶段二：核心功能开发 (已完成)
-- [x] 实现Mermaid文本预览功能
-- [x] 开发组件结构
-- [x] 实现SVG下载功能
-- [x] 添加图像格式转换功能
-- [x] 解决内容安全策略(CSP)问题
+1. ✅ **基础框架搭建**
+   - 基于Manifest V3规范的Chrome扩展结构
+   - React + TypeScript开发环境配置
+   - Webpack构建流程设置
 
-### 阶段三：图表提取功能 (已完成)
-- [x] 实现页面Mermaid图表识别
-- [x] 开发图表元素提取逻辑
-- [x] 实现Mermaid文本提取功能
-- [x] 添加图表预览与下载功能
+2. ✅ **Mermaid渲染核心**
+   - 已实现MermaidRenderer React组件
+   - 支持最新版Mermaid.js库
+   - 实现错误处理和调试功能
+   - 优化渲染性能
 
-### 阶段四：完善与优化 (已完成)
-- [x] 用户界面优化
-- [x] 性能优化
-- [x] 添加错误处理
-- [x] iframe沙盒渲染实现
-- [x] 彻底解决CSP限制问题
-- [x] 解决Service Worker注册失败问题
-- [x] 优化webpack配置，确保不使用eval
+3. ✅ **侧边栏UI骨架**
+   - 侧边栏基础布局
+   - 图表列表组件
+   - 复制按钮功能
+   - 无图表时的提示信息
 
-### 阶段五：打包与发布 (进行中)
-- [x] 代码整理与优化
-- [x] 编写使用说明
-- [x] 完善文档
-- [ ] 打包插件
-- [ ] 准备发布材料
+4. ✅ **转图片页面结构**
+   - 独立页面左右分栏布局
+   - 编辑器-预览区配置
+   - 实时渲染机制
+   - 基础导出按钮
+
+### 正在开发的功能
+
+1. 🔄 **图表检测算法**
+   - DOM遍历和分析
+   - 多种类型Mermaid图表识别
+   - 不同实现方式的兼容性处理
+   - 检测结果的分类和展示
+
+2. 🔄 **缩略图生成**
+   - 小型预览图自动生成
+   - 性能优化处理
+   - 大图表适配
+
+### 计划开发的功能
+
+1. ⏳ **多格式导出引擎**
+   - SVG原生导出
+   - PNG格式转换
+   - JPEG格式支持
+   - 不同尺寸倍数（1x/2x/3x）支持
+
+2. ⏳ **图表模板系统**
+   - 流程图模板
+   - 时序图模板
+   - 类图模板
+   - 状态图模板
+   - 甘特图模板
+
+3. ⏳ **用户体验提升**
+   - 编辑器语法高亮
+   - 主题切换功能
+   - 保存/加载配置
+   - 错误提示优化
+   - 快捷键支持
+
+## 关键里程碑
+
+| 里程碑 | 计划日期 | 实际日期 | 状态 |
+|--------|----------|----------|------|
+| 基础功能实现 | 2025-03-10 | 2025-03-10 | ✅ 已完成 |
+| 图表检测和提取 | 2025-03-20 | - | 🔄 进行中 |
+| 图片导出完整实现 | 2025-04-05 | - | ⏳ 未开始 |
+| 模板系统完成 | 2025-04-10 | - | ⏳ 未开始 |
+| Chrome商店提交 | 2025-05-10 | - | ⏳ 未开始 |
+| 正式发布 | 2025-05-20 | - | ⏳ 未开始 |
+
+## 技术挑战与解决方案
+
+| 挑战 | 状态 | 解决方案 |
+|------|------|----------|
+| 网页内Mermaid图表的准确识别 | 🔄 进行中 | 结合多种检测方法，分析DOM结构和SVG特征 |
+| 侧边栏与页面的通信机制 | ✅ 已解决 | 使用Chrome扩展消息传递API，实现侧边栏与内容脚本的双向通信 |
+| 图片尺寸和质量控制 | ⏳ 未开始 | 实现可配置的尺寸倍数选项，优化SVG转PNG/JPEG的过程 |
+| 跨域限制下的图表处理 | ⏳ 未开始 | 使用Chrome扩展API提供的跨域能力 |
+| 大型图表的性能问题 | 🔄 进行中 | 实现渲染限制和优化策略 |
+| 缩略图生成优化 | 🔄 进行中 | 使用Web Workers进行缩略图生成，避免阻塞主线程 |
+
+## 下一步计划
+
+1. 完成网页图表检测算法，提高准确率和覆盖率
+2. 实现高效的缩略图生成，让侧边栏列表预览更直观
+3. 完善多格式导出功能，支持不同尺寸倍数的选择
+4. 添加常用图表类型的模板系统，方便用户快速创建图表
+5. 优化编辑器体验，添加语法高亮和辅助功能
+
+## 团队协作
+
+| 成员 | 职责 | 当前任务 |
+|------|------|----------|
+| 开发者A | 前端开发 | 侧边栏界面优化 |
+| 开发者B | 核心功能 | 图表检测算法 |
+| 开发者C | 图像处理 | 图片导出功能 |
+| 测试人员 | 功能测试 | 测试计划制定 |
+
+## 风险评估
+
+| 风险 | 可能性 | 影响 | 缓解策略 |
+|------|--------|------|----------|
+| Mermaid语法变更 | 中 | 高 | 保持对Mermaid库的更新，实现版本兼容层 |
+| 网页结构复杂导致检测失败 | 高 | 中 | 开发多种备选检测策略，提供手动选择功能 |
+| 浏览器策略变更影响扩展功能 | 低 | 高 | 关注Chrome扩展平台更新，及时调整实现方式 |
+| 大型图表处理性能不足 | 中 | 中 | 实现渐进式渲染和处理大小限制选项 |
+| 侧边栏通信延迟 | 中 | 低 | 优化消息传递机制，添加缓存策略 |
 
 ## 已解决问题
 
@@ -49,7 +122,7 @@
   4. ~~在manifest.json中配置web_accessible_resources允许访问渲染器页面~~
   5. ~~移除'unsafe-eval'指令，使用标准CSP配置~~
 
-#### 最终解决方案 (2024-03-11)
+#### 最终解决方案 (2025-03-01)
 1. 使用Chrome扩展的沙盒特性
    - 在manifest.json中添加sandbox配置，指定mermaid-renderer.html为沙盒页面
    - 为沙盒页面单独设置CSP规则，允许使用unsafe-inline
@@ -68,118 +141,10 @@
    - 通过postMessage与主扩展通信
    - 在沙盒环境中安全执行操作
 
-3. 更新iframe通信机制
-   - 实现基于postMessage的双向通信
-   - 添加错误处理和状态反馈
-   - 支持SVG尺寸信息传递
-
-### Service Worker注册失败问题
-- 问题：扩展加载时出现Service Worker注册失败（Status code: 15）错误
-- 原因：
-  1. background.js中使用了不兼容Manifest V3的API (chrome.tabs.executeScript)
-  2. webpack配置生成包含eval的代码，违反CSP策略
-
-#### 解决方案 (2024-03-11)
-1. 更新background脚本中的API使用：
-   - 将旧版chrome.tabs.executeScript替换为新版chrome.scripting.executeScript
-   - 使用async/await处理异步操作
-   - 改进错误处理机制
-   ```typescript
-   // 旧代码
-   chrome.tabs.executeScript(
-     { code: 'window.getSelection().toString();' },
-     (selection) => {
-       sendResponse({ text: selection[0] || '' });
-     }
-   );
-   
-   // 新代码
-   chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
-     if (tabs[0]?.id) {
-       try {
-         const results = await chrome.scripting.executeScript({
-           target: { tabId: tabs[0].id },
-           func: () => window.getSelection()?.toString() || '',
-         });
-         sendResponse({ text: results[0]?.result || '' });
-       } catch (error: unknown) {
-         console.error('执行脚本错误:', error);
-         const errorMessage = error instanceof Error ? error.message : String(error);
-         sendResponse({ text: '', error: errorMessage });
-       }
-     }
-   });
-   ```
-
-2. 优化webpack配置：
-   - 添加source-map配置，避免使用eval
-   - 设置优化选项，确保不使用eval相关功能
-   - 添加clean: true配置，每次构建前清理dist目录
-   ```javascript
-   // webpack.config.js
-   module.exports = {
-     mode: 'development',
-     devtool: 'source-map',
-     // ...其他配置
-     output: {
-       path: path.resolve(__dirname, 'dist'),
-       filename: '[name].js',
-       clean: true, // 自动清理dist目录
-     },
-     optimization: {
-       minimize: true,
-       moduleIds: 'deterministic',
-       chunkIds: 'deterministic',
-     },
-     // ...其他配置
-   };
-   ```
-
-### 图表提取问题
-- 问题：不同网站的Mermaid图表实现方式各不相同，难以统一提取
-- 解决方案：
-  1. 使用多种选择器匹配不同实现方式的Mermaid图表
-  2. 实现多种文本提取策略，提高成功率
-  3. 使用chrome.scripting.executeScript注入提取脚本
-  4. 通过消息传递机制将提取结果发送回扩展
-
-### 图像导出问题
-- 问题：访问iframe内容的跨域限制
-- 解决方案：
-  1. 通过iframe的contentDocument安全地访问SVG元素
-  2. 使用SVG克隆和序列化技术导出SVG格式
-  3. 采用html-to-image库处理PNG和JPEG格式的导出
-
-## 近期更新
-
-### 2024-03-11：解决Service Worker注册失败和webpack优化
-- 更新background脚本，将不兼容的API替换为Manifest V3兼容的API
-- 优化webpack配置，使用source-map替代eval，避免CSP违规
-- 添加构建自动清理功能，确保每次构建前dist目录被清空
-- 创建了详细的Chrome扩展最佳实践文档，专注于Service Worker和CSP问题
-- 完善错误处理机制，提高扩展的稳定性和可靠性
-
-### 2024-03-11：使用Chrome扩展沙盒彻底解决CSP问题
-- 应用Chrome扩展的沙盒特性隔离Mermaid.js执行环境
-- 重新设计渲染机制，使用独立的mermaid-script.js脚本动态加载Mermaid库
-- 完善postMessage通信系统，实现更可靠的错误处理
-- 更新manifest.json配置，为沙盒页面设置单独的CSP规则，移除unsafe-eval
-- 重构MermaidPreview和MermaidExtractor组件，适配新的渲染机制
-- 解决了在Manifest V3下无法使用eval()的问题，使扩展完全符合Chrome的安全要求
-
-## 待解决问题
-
-### 主题支持
-- 需要添加对不同Mermaid主题的支持
-- 计划添加主题选择选项
-
-### 高级图表功能
-- 需要支持Mermaid的更多高级功能和图表类型
-- 需要测试不同类型图表的兼容性
-
-### 图像导出配置
-- 需要添加图像导出的更多选项
-- 计划添加图像尺寸、背景色等设置
-
-## 当前状态
-项目已完成主要功能开发，彻底解决了核心的CSP问题和Service Worker注册失败问题，完全符合Chrome扩展的最新安全要求。已实现基本的Mermaid预览和提取功能，并优化了用户界面和错误处理。下一步计划添加更多设置选项和主题支持，提高用户体验，准备发布到Chrome网上应用店。 
+### 侧边栏通信机制
+- 问题：Chrome扩展侧边栏需要与内容脚本通信获取图表信息
+- 解决方案（2025-03-05）：
+  1. 使用chrome.tabs.sendMessage在侧边栏和内容脚本之间传递消息
+  2. 实现消息类型系统，区分不同操作请求
+  3. 添加请求ID和状态跟踪，确保消息匹配
+  4. 实现错误处理和超时机制 

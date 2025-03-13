@@ -9,7 +9,7 @@ module.exports = {
     popup: './src/popup/index.tsx',
     content: './src/content/index.ts',
     background: './src/background/index.ts',
-    renderer: './src/renderer/index.js',
+    renderer: './src/renderer/index.jsx',
     preview: './src/preview/index.tsx',
   },
   output: {
@@ -42,13 +42,26 @@ module.exports = {
         exclude: /node_modules/,
       },
       {
+        test: /\.jsx?$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: [
+              '@babel/preset-env',
+              ['@babel/preset-react', {runtime: 'automatic'}]
+            ]
+          }
+        }
+      },
+      {
         test: /\.css$/i,
         use: ['style-loader', 'css-loader', 'postcss-loader'],
       },
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
+    extensions: ['.tsx', '.ts', '.jsx', '.js'],
   },
   plugins: [
     new HtmlWebpackPlugin({
