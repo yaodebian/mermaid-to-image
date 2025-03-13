@@ -1,4 +1,4 @@
-# Mermaid图表提取器
+# Mermaid图表提取器【文档暂时是AI生成，等主流程初步完成，再开始手动维护】
 
 <div align="center">
   <img src="icons/icon128.png" alt="Mermaid图表提取器" width="128"/>
