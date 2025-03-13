@@ -2,6 +2,35 @@
 
 一个Chrome扩展，用于从网页中提取Mermaid图表并转换为图片。
 
+## 最近更新
+
+### 2025年03月12日最新修复
+
+我们修复了几个影响用户体验的问题：
+
+1. **语法报错显示重复问题**
+   - **问题**：当Mermaid语法有错误时，错误信息会在界面中显示两次
+   - **解决方案**：重构了错误处理机制，将错误显示责任完全交给沙盒iframe，避免在组件中重复显示
+   - **技术细节**：移除了MermaidPreview组件中的RenderError显示，保留错误状态跟踪但不再重复渲染
+
+2. **清空编辑框时渲染不清空问题**
+   - **问题**：当用户清空编辑框时，渲染区域仍然显示旧内容
+   - **解决方案**：实现了专门的清空命令通信机制，在清空编辑框时主动通知渲染器清空内容
+   - **技术细节**：添加了`clear-mermaid`消息类型，在编辑框清空和点击清空按钮时触发，确保渲染区域同步更新
+
+3. **渲染错误时显示冗余错误信息**
+   - **问题**：渲染错误时会同时显示组件内自定义错误视图和Mermaid官方错误视图
+   - **解决方案**：统一了错误显示逻辑，确保只显示一次格式一致的错误信息
+   - **技术细节**：优化了错误处理流程，改进了`showSyntaxError`函数，统一了错误信息格式和显示样式
+
+### 其他优化
+
+- **改进通信机制**：使用requestId参数跟踪渲染请求，确保消息正确匹配处理
+- **增强调试能力**：添加更详细的日志记录，方便开发者排查问题
+- **优化界面反馈**：提供更清晰的错误提示和加载状态指示
+- **安全渲染**：增强了沙盒iframe的渲染隔离和通信安全
+- **自适应高度**：渲染区域现在可以根据图表实际大小自动调整高度，提供更好的视觉体验
+
 ## 功能特点
 
 - 在网页中预览Mermaid图表
@@ -174,6 +203,30 @@ npm run prod
 3. 预览模式：输入Mermaid文本，查看渲染结果，可下载为图像
 4. 提取模式：自动提取页面上的Mermaid图表，可提取文本和下载图像
 
+## 排错指南
+
+### 常见问题及解决方案
+
+1. **预览弹窗不显示**
+   - 确保内容脚本已正确注入，检查manifest.json中的content_scripts配置
+   - 查看浏览器控制台是否有错误信息
+   - 尝试重新加载扩展
+
+2. **渲染错误**
+   - 确认Mermaid语法是否正确
+   - 检查调试模式下的日志信息，了解具体错误原因
+   - 参考[Mermaid官方语法文档](https://mermaid.js.org/syntax/flowchart.html)
+
+3. **图表导出问题**
+   - 确保渲染成功后再尝试导出
+   - 对于特别复杂的图表，可以尝试调整缩放比例后导出
+
+### 开发调试技巧
+
+- 启用调试模式查看详细日志信息
+- 使用Chrome开发者工具检查扩展的background和content页面
+- 查看沙盒iframe的控制台输出，找出渲染过程中的问题
+
 ## 安全说明
 
 本扩展通过以下方式遵守Chrome的内容安全策略要求：
@@ -182,37 +235,6 @@ npm run prod
 2. 扩展页面CSP配置：严格遵循安全标准 `script-src 'self'; object-src 'self'`
 3. 沙盒页面CSP配置：单独为沙盒页面配置允许inline脚本和外部CDN的规则
 4. 避免使用eval：webpack配置优化，使用source-map替代eval确保符合CSP要求
-
-## Manifest V3兼容性
-
-本扩展完全兼容Chrome扩展的Manifest V3规范，解决了常见的CSP限制问题：
-
-```json
-"sandbox": {
-  "pages": ["mermaid-renderer.html"]
-},
-"content_security_policy": {
-  "extension_pages": "script-src 'self'; object-src 'self'",
-  "sandbox": "sandbox allow-scripts allow-forms allow-popups; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; object-src 'self'"
-}
-```
-
-## 常见问题排查
-
-### Service Worker注册失败（Status code: 15）
-如果遇到Service Worker注册失败问题，可能的原因：
-1. background.js中使用了不兼容Manifest V3的API（如executeScript）
-2. 在webpack打包时出现问题
-
-解决方法：
-- 确保使用chrome.scripting.executeScript代替旧版chrome.tabs.executeScript
-- 确保webpack配置正确，不使用eval相关功能
-
-### 内容安全策略错误
-如果遇到CSP错误（unsafe-eval, unsafe-inline等），解决方法：
-1. 检查webpack配置，使用source-map而非eval
-2. 避免使用需要eval的代码
-3. 将需要特殊权限的代码移至沙盒页面执行
 
 ## 许可证
 
