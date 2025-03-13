@@ -25,7 +25,15 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["mermaid-renderer.html", "renderer.js", "preview.html", "preview.js"],
+      "resources": [
+        "mermaid-renderer.html",
+        "renderer.js",
+        "preview.html",
+        "preview.js",
+        "node_modules_*",
+        "*.js",
+        "*.map"
+      ],
       "matches": ["<all_urls>"]
     }
   ],

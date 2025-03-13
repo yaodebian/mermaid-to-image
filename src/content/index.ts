@@ -57,15 +57,35 @@ const openPreviewInNewTab = () => {
       finalUrl = `${previewUrl}?code=${encodedText}`;
     }
     
-    // 在新标签页中打开预览页面
-    chrome.runtime.sendMessage({
-      action: 'openTab',
-      url: finalUrl
-    });
+    // 直接在新标签页中打开预览页面，不依赖background script
+    // 如果当前浏览器版本支持chrome.tabs.create，则使用此API
+    if (chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({ url: finalUrl }, (tab) => {
+        console.log('已直接打开Mermaid预览标签页', tab?.id);
+      });
+    } else {
+      // 退化到使用background script打开
+      chrome.runtime.sendMessage({
+        action: 'openTab',
+        url: finalUrl
+      }, (response) => {
+        if (response && response.success) {
+          console.log('通过background script打开Mermaid预览标签页', response.tabId);
+        } else {
+          console.error('打开页面失败:', response?.error);
+        }
+      });
+    }
     
     console.log('预览页面打开请求已发送');
   } catch (error) {
     console.error('打开预览标签页时出错:', error);
+    // 尝试回退到旧方法
+    try {
+      window.open(chrome.runtime.getURL('preview.html'), '_blank');
+    } catch (e) {
+      console.error('回退方法也失败:', e);
+    }
   }
 };
 
