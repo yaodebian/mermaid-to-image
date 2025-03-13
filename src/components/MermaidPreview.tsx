@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as htmlToImage from 'html-to-image';
+import MermaidRenderer from './MermaidRenderer';
 
 // 全局初始化Mermaid不再需要，改为使用沙盒中的Mermaid
 // try {
@@ -56,6 +57,63 @@ const DEFAULT_MERMAID_TEXT = `graph TD
     D --> F[结束]
     E --> F`;
 
+// 添加更多官方示例代码
+const MERMAID_EXAMPLES = {
+  flowchart: `flowchart LR
+    A[方形节点] --> B(圆角节点)
+    B --> C{菱形节点}
+    C -->|选项1| D[结果1]
+    C -->|选项2| E[结果2]`,
+  
+  sequenceDiagram: `sequenceDiagram
+    participant 浏览器
+    participant 服务器
+    浏览器->>服务器: GET请求
+    服务器-->>浏览器: 返回HTML
+    浏览器->>服务器: GET资源
+    服务器-->>浏览器: 返回资源
+    Note right of 浏览器: 渲染页面`,
+  
+  classDiagram: `classDiagram
+    class Animal {
+      +String name
+      +move()
+    }
+    class Dog {
+      +String breed
+      +bark()
+    }
+    class Bird {
+      +String color
+      +fly()
+    }
+    Animal <|-- Dog
+    Animal <|-- Bird`,
+  
+  gantt: `gantt
+    title 项目计划
+    dateFormat YYYY-MM-DD
+    section 计划阶段
+    需求分析     :a1, 2023-01-01, 7d
+    设计文档     :a2, after a1, 5d
+    section 开发阶段
+    编码实现     :a3, after a2, 10d
+    单元测试     :a4, after a3, 5d
+    section 发布阶段
+    部署上线     :a5, after a4, 2d`,
+  
+  pieChart: `pie title 用户分布
+    "中国" : 45
+    "美国" : 25
+    "欧洲" : 20
+    "其他" : 10`,
+  
+  erDiagram: `erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    ORDER ||--|{ LINE-ITEM : contains
+    CUSTOMER }|..|{ DELIVERY-ADDRESS : uses`
+};
+
 // 错误组件
 const RenderError: React.FC<{error: string, code?: string}> = ({ error, code }) => {
   // 尝试提取错误行和字符位置
@@ -104,264 +162,77 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   const [isLoading, setIsLoading] = useState(false);
   const [exportScale, setExportScale] = useState(1);
   const [debugMode, setDebugMode] = useState(false);
-  const [rendererStatus, setRendererStatus] = useState<'未初始化' | '加载中' | '就绪' | '错误'>('未初始化');
+  const [selectedExample, setSelectedExample] = useState<string | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [renderKey, setRenderKey] = useState<number>(0);
   const previewRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const svgRef = useRef<SVGElement | null>(null);
-  const isIframeLoaded = useRef<boolean>(false);
-  const renderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [svgDimensions, setSvgDimensions] = useState<{width: number, height: number} | null>(null);
   
-  // 使用绝对路径加载iframe
-  const getRendererUrl = (): string => {
-    // 尝试使用chrome-extension://协议，确保路径正确
-    try {
-      // 此处路径指向webpack生成的mermaid-renderer.html
-      return chrome.runtime.getURL("mermaid-renderer.html");
-    } catch (e) {
-      console.error("无法获取chrome.runtime.getURL", e);
-      // 回退到相对路径
-      return "./mermaid-renderer.html";
-    }
+  // 加载示例代码
+  const loadExample = (type: keyof typeof MERMAID_EXAMPLES) => {
+    setMermaidText(MERMAID_EXAMPLES[type]);
+    setSelectedExample(type);
+    // 强制重新渲染
+    setRenderKey(prev => prev + 1);
   };
 
-  // 开启调试模式
-  const toggleDebugMode = () => {
-    const newDebugMode = !debugMode;
-    setDebugMode(newDebugMode);
-    
-    // 如果iframe已加载，通知iframe更新调试模式
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'debug-mode',
-        enabled: newDebugMode
-      }, '*');
-    }
-  };
-
-  // 处理iframe加载完成事件
-  const handleIframeLoad = useCallback(() => {
-    console.log('iframe已加载');
-    isIframeLoaded.current = true;
-    setRendererStatus('加载中');
-    
-    // 仅在iframe刚加载完时启用调试模式
-    if (debugMode && iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'debug-mode',
-        enabled: true
-      }, '*');
-    }
-    
-    // 设置安全超时，如果长时间没有收到渲染完成消息，自动关闭加载状态
-    setTimeout(() => {
-      // 如果还处于加载状态，认为是渲染卡住了
-      if (isLoading) {
-        console.log('渲染超时，自动关闭加载状态');
-        setIsLoading(false);
-      }
-    }, 5000); // 5秒超时
-  }, [debugMode, isLoading]);
-
-  // 监听来自iframe的消息
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (!event.data || typeof event.data !== 'object') return;
-      
-      console.log('收到iframe消息:', event.data.type);
-      
-      if (event.data.type === 'mermaid-rendered') {
-        setIsLoading(false);
-        
-        if (event.data.success) {
-          setError(null);
-          
-          // 保存SVG尺寸信息用于自适应高度
-          if (event.data.width && event.data.height) {
-            setSvgDimensions({
-              width: event.data.width,
-              height: event.data.height
-            });
-          }
-          
-          // 通过iframe的contentDocument获取SVG元素
-          if (iframeRef.current && iframeRef.current.contentDocument) {
-            const svgEl = iframeRef.current.contentDocument.querySelector('svg');
-            if (svgEl) {
-              svgRef.current = svgEl;
-              // 确保SVG元素是可见的，消除空白渲染问题
-              svgEl.style.display = 'block';
-              svgEl.style.margin = '0 auto';
-            } else {
-              console.error('收到渲染成功消息但未找到SVG元素');
-            }
-          }
-        } else {
-          setError(event.data.error || '渲染失败');
-        }
-      } else if (event.data.type === 'mermaid-ready') {
-        console.log('Mermaid沙盒已准备就绪', event.data);
-        if (event.data.success) {
-          // 沙盒中的Mermaid已初始化完成，可以发送渲染请求
-          setRendererStatus('就绪');
-          if (mermaidText.trim()) {
-            renderMermaid(mermaidText);
-          }
-        } else {
-          setRendererStatus('错误');
-          setError(event.data.error || 'Mermaid初始化失败');
-        }
-      }
-    };
-    
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  // 清空编辑框
+  // 清空文本
   const handleClear = () => {
     setMermaidText('');
     setError(null);
-    
-    // 向iframe发送清空命令
-    if (iframeRef.current?.contentWindow) {
-      iframeRef.current.contentWindow.postMessage({
-        type: 'clear-mermaid',
-        requestId: Date.now()
-      }, '*');
-    }
   };
 
-  // 防抖函数：等待用户停止输入一段时间后再渲染
-  const debouncedRender = useCallback((text: string) => {
-    if (renderTimeoutRef.current) {
-      clearTimeout(renderTimeoutRef.current);
-    }
-    
-    // 如果没有文本，发送清空命令
-    if (!text.trim()) {
-      setError(null);
-      // 清空渲染区域
-      if (iframeRef.current?.contentWindow) {
-        iframeRef.current.contentWindow.postMessage({
-          type: 'clear-mermaid',
-          requestId: Date.now()
-        }, '*');
-      }
-      return;
-    }
-    
-    // 延迟300ms再渲染，减少频繁渲染
-    renderTimeoutRef.current = setTimeout(() => {
-      console.log('执行延迟渲染', text.substring(0, 20) + '...');
-      renderMermaid(text);
-    }, 300);
-  }, []);
-
-  // 通过iframe渲染Mermaid图表
-  const renderMermaid = useCallback((code: string) => {
-    if (!code.trim()) return;
-    
-    if (!iframeRef.current || !iframeRef.current.contentWindow) {
-      console.error('iframe未加载，无法渲染');
-      setError('渲染器未准备好，请刷新后重试');
-      return;
-    }
-    
-    setIsLoading(true);
-    console.log('发送Mermaid代码到iframe', code.length + '字符');
-    
-    // 设置渲染超时保护
-    const renderTimeout = setTimeout(() => {
-      console.warn('渲染操作超时');
-      setIsLoading(false);
-    }, 10000); // 10秒后如果没有响应，自动关闭加载状态
-    
-    // 向iframe发送消息，请求渲染Mermaid
-    iframeRef.current.contentWindow.postMessage({
-      type: 'render-mermaid',
-      code: code,
-      requestId: Date.now() // 添加请求ID便于调试
-    }, '*');
-    
-    // 清除之前的超时
-    return () => clearTimeout(renderTimeout);
-  }, []);
-
-  // 强制重新渲染当前图表
+  // 强制重新渲染
   const handleForceRender = () => {
-    if (mermaidText.trim()) {
-      renderMermaid(mermaidText);
-    }
+    setRenderKey(prev => prev + 1);
   };
-
-  // 当文本改变时渲染新的Mermaid文本
-  useEffect(() => {
-    console.log('文本变化', { length: mermaidText.length, status: rendererStatus, loaded: isIframeLoaded.current });
+  
+  // 处理渲染完成事件
+  const handleRenderComplete = useCallback((success: boolean, errorMsg?: string, svg?: SVGElement) => {
+    setIsLoading(false);
     
-    // 即使状态不是就绪，也尝试渲染，因为iframe可能已经准备好但没有通知
-    if (isIframeLoaded.current) {
-      // 如果状态不是就绪，也允许渲染，只要iframe已加载
-      debouncedRender(mermaidText);
-    }
-  }, [mermaidText, debouncedRender]);
-
-  // 额外添加一个useEffect以便在iframe加载完成后立即渲染当前文本
-  useEffect(() => {
-    if (isIframeLoaded.current && mermaidText.trim()) {
-      console.log('iframe已加载，立即渲染当前文本');
-      renderMermaid(mermaidText);
-    }
-  }, [isIframeLoaded.current]); // 依赖于isIframeLoaded.current的变化
-
-  // 清理副作用
-  useEffect(() => {
-    return () => {
-      if (renderTimeoutRef.current) {
-        clearTimeout(renderTimeoutRef.current);
+    if (!success) {
+      setError(errorMsg || '渲染失败');
+      svgRef.current = null;
+    } else {
+      setError(null);
+      if (svg) {
+        svgRef.current = svg;
       }
-    };
+    }
   }, []);
 
   // 下载SVG格式
   const handleDownloadSVG = () => {
     try {
-      if (!iframeRef.current || !iframeRef.current.contentDocument) {
-        throw new Error('未找到iframe或SVG元素');
-      }
-      
-      // 从iframe中获取SVG元素
-      const svgElement = iframeRef.current.contentDocument.querySelector('svg');
-      if (!svgElement) {
+      if (!svgRef.current) {
         throw new Error('未找到SVG元素');
       }
-
-      // 创建一个新的SVG并拷贝属性
-      const svgClone = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      Array.from(svgElement.attributes).forEach(attr => {
-        svgClone.setAttribute(attr.name, attr.value);
-      });
       
-      // 设置缩放比例
+      // 复制SVG元素并应用缩放
+      const svgCopy = svgRef.current.cloneNode(true) as SVGElement;
+      
+      // 应用缩放比例
       if (exportScale !== 1) {
-        const originalWidth = svgElement.getAttribute('width') || svgElement.getBoundingClientRect().width.toString();
-        const originalHeight = svgElement.getAttribute('height') || svgElement.getBoundingClientRect().height.toString();
+        const originalWidth = svgRef.current.getAttribute('width') || svgRef.current.getBoundingClientRect().width.toString();
+        const originalHeight = svgRef.current.getAttribute('height') || svgRef.current.getBoundingClientRect().height.toString();
         const width = parseFloat(originalWidth) * exportScale;
         const height = parseFloat(originalHeight) * exportScale;
         
-        svgClone.setAttribute('width', `${width}`);
-        svgClone.setAttribute('height', `${height}`);
-        svgClone.setAttribute('viewBox', svgElement.getAttribute('viewBox') || `0 0 ${originalWidth} ${originalHeight}`);
+        svgCopy.setAttribute('width', `${width}px`);
+        svgCopy.setAttribute('height', `${height}px`);
       }
       
-      // 拷贝内容
-      svgClone.innerHTML = svgElement.innerHTML;
+      // 处理xmlns属性
+      if (!svgCopy.getAttribute('xmlns')) {
+        svgCopy.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
       
-      // 转换为blob
-      const svgData = new XMLSerializer().serializeToString(svgClone);
+      // 将SVG转换为文本
+      const svgData = new XMLSerializer().serializeToString(svgCopy);
+      
+      // 创建Blob对象并下载
       const blob = new Blob([svgData], { type: 'image/svg+xml' });
-      
-      // 下载
       downloadBlob(blob, 'mermaid-diagram.svg');
     } catch (err) {
       setError((err as Error).message || '下载SVG失败');
@@ -372,21 +243,15 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   // 下载PNG格式
   const handleDownloadPNG = async () => {
     try {
-      if (!iframeRef.current || !iframeRef.current.contentDocument) {
-        throw new Error('未找到iframe或SVG元素');
-      }
-      
-      // 从iframe中获取SVG元素
-      const svgElement = iframeRef.current.contentDocument.querySelector('svg');
-      if (!svgElement) {
+      if (!svgRef.current) {
         throw new Error('未找到SVG元素');
       }
       
       // 创建一个临时的带缩放的SVG克隆
-      const tempSvg = svgElement.cloneNode(true) as SVGElement;
+      const tempSvg = svgRef.current.cloneNode(true) as SVGElement;
       if (exportScale !== 1) {
-        const originalWidth = svgElement.getAttribute('width') || svgElement.getBoundingClientRect().width.toString();
-        const originalHeight = svgElement.getAttribute('height') || svgElement.getBoundingClientRect().height.toString();
+        const originalWidth = svgRef.current.getAttribute('width') || svgRef.current.getBoundingClientRect().width.toString();
+        const originalHeight = svgRef.current.getAttribute('height') || svgRef.current.getBoundingClientRect().height.toString();
         const width = parseFloat(originalWidth) * exportScale;
         const height = parseFloat(originalHeight) * exportScale;
         
@@ -411,21 +276,15 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   // 下载JPEG格式
   const handleDownloadJPEG = async () => {
     try {
-      if (!iframeRef.current || !iframeRef.current.contentDocument) {
-        throw new Error('未找到iframe或SVG元素');
-      }
-      
-      // 从iframe中获取SVG元素
-      const svgElement = iframeRef.current.contentDocument.querySelector('svg');
-      if (!svgElement) {
+      if (!svgRef.current) {
         throw new Error('未找到SVG元素');
       }
       
       // 创建一个临时的带缩放的SVG克隆
-      const tempSvg = svgElement.cloneNode(true) as SVGElement;
+      const tempSvg = svgRef.current.cloneNode(true) as SVGElement;
       if (exportScale !== 1) {
-        const originalWidth = svgElement.getAttribute('width') || svgElement.getBoundingClientRect().width.toString();
-        const originalHeight = svgElement.getAttribute('height') || svgElement.getBoundingClientRect().height.toString();
+        const originalWidth = svgRef.current.getAttribute('width') || svgRef.current.getBoundingClientRect().width.toString();
+        const originalHeight = svgRef.current.getAttribute('height') || svgRef.current.getBoundingClientRect().height.toString();
         const width = parseFloat(originalWidth) * exportScale;
         const height = parseFloat(originalHeight) * exportScale;
         
@@ -466,7 +325,7 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
   return (
     <ErrorBoundary>
       <div 
-        className="flex flex-col h-full" 
+        className="flex flex-row h-full" 
         style={{ 
           pointerEvents: 'auto', 
           position: 'relative',
@@ -474,7 +333,8 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
         }}
         onScroll={handleScroll}
       >
-        <div className="mb-4">
+        {/* 左侧编辑器区域 */}
+        <div className="w-1/2 pr-2">
           <div className="flex justify-between items-center mb-1">
             <label 
               htmlFor="mermaid-input" 
@@ -491,35 +351,96 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
                 清空
               </button>
               <button
+                className={`text-xs px-2 py-1 rounded ${showHelp ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}`}
+                onClick={() => setShowHelp(!showHelp)}
+                title="查看Mermaid帮助"
+              >
+                帮助
+              </button>
+              <button
                 className={`text-xs px-2 py-1 rounded ${debugMode ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-800'}`}
-                onClick={toggleDebugMode}
+                onClick={() => setDebugMode(!debugMode)}
                 title="开启调试模式"
               >
                 调试
               </button>
             </div>
           </div>
+          
+          {/* 帮助信息 */}
+          {showHelp && (
+            <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-800 overflow-auto" style={{ maxHeight: '200px' }}>
+              <h3 className="font-bold mb-1">Mermaid图表语法帮助</h3>
+              <p className="mb-1">Mermaid可以创建各种类型的图表，点击上方的示例按钮可以快速开始。</p>
+              <ul className="list-disc pl-4 mb-1">
+                <li><strong>流程图 (flowchart)</strong>: 使用 flowchart LR (左到右) 或 TD (上到下) 开始</li>
+                <li><strong>时序图 (sequenceDiagram)</strong>: 使用 sequenceDiagram 开始，展示交互过程</li>
+                <li><strong>类图 (classDiagram)</strong>: 使用 classDiagram 开始，展示类结构和关系</li>
+                <li><strong>甘特图 (gantt)</strong>: 使用 gantt 开始，展示项目时间线</li>
+                <li><strong>饼图 (pie)</strong>: 使用 pie 开始，展示数据百分比</li>
+                <li><strong>实体关系图 (erDiagram)</strong>: 使用 erDiagram 开始，展示数据库关系</li>
+              </ul>
+              <p className="mb-1">常用语法：</p>
+              <ul className="list-disc pl-4">
+                <li>节点形状: [方形], (圆角), {'{'}菱形{'}'}, 等</li>
+                <li>连接符: --{'>'}，-..-{'>'}（虚线），=={'>'}(粗线), -.-{'>'}(虚线)</li>
+                <li>添加文字: --{'>'}|文字|</li>
+              </ul>
+              <p className="mt-1">
+                <a 
+                  href="https://mermaid.js.org/intro/syntax-reference.html" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  查看完整语法参考 →
+                </a>
+              </p>
+            </div>
+          )}
+          
+          {/* 示例选择器 */}
+          <div className="mb-2 flex flex-wrap gap-1">
+            <span className="text-xs text-gray-600 self-center mr-1">加载示例:</span>
+            {Object.keys(MERMAID_EXAMPLES).map((type) => (
+              <button
+                key={type}
+                className={`text-xs px-2 py-1 rounded ${
+                  selectedExample === type 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+                onClick={() => loadExample(type as keyof typeof MERMAID_EXAMPLES)}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+          
           <textarea
             id="mermaid-input"
-            className="w-full p-2 border border-gray-300 rounded-md min-h-[120px]"
+            className="w-full p-2 border border-gray-300 rounded-md"
             value={mermaidText}
             onChange={(e) => setMermaidText(e.target.value)}
             placeholder="输入Mermaid语法，例如：graph TD; A-->B;"
             aria-label="Mermaid文本输入"
-            style={{ pointerEvents: 'auto' }}
+            style={{ 
+              pointerEvents: 'auto', 
+              height: showHelp ? 'calc(100vh - 380px)' : 'calc(100vh - 180px)', 
+              minHeight: '200px' 
+            }}
           />
         </div>
 
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
+        {/* 右侧预览区域 */}
+        <div className="w-1/2 pl-2">
+          <div className="flex justify-between items-center mb-1">
             <div className="flex items-center">
               <h3 className="text-sm font-medium text-gray-700 mr-2">预览</h3>
               <span className={`text-xs px-2 py-0.5 rounded ${
-                rendererStatus === '就绪' ? 'bg-green-100 text-green-800' : 
-                rendererStatus === '错误' ? 'bg-red-100 text-red-800' :
-                'bg-yellow-100 text-yellow-800'
+                error ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
               }`}>
-                {rendererStatus}
+                {error ? '错误' : '就绪'}
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -541,102 +462,63 @@ const MermaidPreview: React.FC<MermaidPreviewProps> = ({ initialText = '' }) => 
               <button
                 className="px-2 py-1 text-xs bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
                 onClick={handleForceRender}
-                disabled={!mermaidText.trim() || isLoading}
                 title="强制重新渲染"
               >
                 刷新
               </button>
-              <button
-                className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
-                onClick={handleDownloadSVG}
-                disabled={!mermaidText.trim() || !!error || isLoading}
-                aria-label="下载SVG"
-                style={{ pointerEvents: !!error ? 'none' : 'auto' }}
-              >
-                SVG
-              </button>
-              <button
-                className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
-                onClick={handleDownloadPNG}
-                disabled={!mermaidText.trim() || !!error || isLoading}
-                aria-label="下载PNG"
-                style={{ pointerEvents: !!error ? 'none' : 'auto' }}
-              >
-                PNG
-              </button>
-              <button
-                className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
-                onClick={handleDownloadJPEG}
-                disabled={!mermaidText.trim() || !!error || isLoading}
-                aria-label="下载JPEG"
-                style={{ pointerEvents: !!error ? 'none' : 'auto' }}
-              >
-                JPEG
-              </button>
             </div>
           </div>
-          
-          <div className="flex-1 relative mt-2">
-            <div 
-              className="bg-white border border-gray-300 rounded-md p-3 overflow-auto"
-              ref={previewRef}
-              style={{ 
-                minHeight: '250px',
-                maxHeight: '600px' // 添加最大高度限制
-              }}
+
+          <div className="flex justify-end space-x-1 mb-1">
+            <button
+              className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
+              onClick={handleDownloadSVG}
+              disabled={!mermaidText.trim() || !!error}
+              aria-label="下载SVG"
+              style={{ pointerEvents: !!error ? 'none' : 'auto' }}
             >
-              <div className="flex flex-col">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-700">
-                    渲染预览{rendererStatus !== '就绪' ? ` - ${rendererStatus}` : ''}
-                  </span>
-                  <button
-                    className="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-                    onClick={handleForceRender}
-                    title="重新渲染"
-                  >
-                    刷新
-                  </button>
-                </div>
-                
-                <iframe
-                  ref={iframeRef}
-                  src={getRendererUrl()}
-                  style={{
-                    width: '100%',
-                    height: svgDimensions 
-                      ? `${Math.min(svgDimensions.height + 40, 550)}px` // 根据SVG高度自适应，并设置上限
-                      : isLoading || error ? '250px' : '400px', // 默认高度
-                    border: 'none',
-                    overflow: 'hidden',
-                    transition: 'height 0.3s ease', // 平滑过渡
-                    backgroundColor: '#fff'
-                  }}
-                  sandbox="allow-scripts allow-same-origin allow-downloads"
-                  onLoad={handleIframeLoad}
-                  title="Mermaid渲染器"
-                />
-                
-                {isLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70">
-                    <div className="text-gray-500">
-                      <svg className="animate-spin h-5 w-5 mr-3 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      渲染中...
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              SVG
+            </button>
+            <button
+              className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
+              onClick={handleDownloadPNG}
+              disabled={!mermaidText.trim() || !!error}
+              aria-label="下载PNG"
+              style={{ pointerEvents: !!error ? 'none' : 'auto' }}
+            >
+              PNG
+            </button>
+            <button
+              className="px-2 py-1 text-xs text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-blue-300"
+              onClick={handleDownloadJPEG}
+              disabled={!mermaidText.trim() || !!error}
+              aria-label="下载JPEG"
+              style={{ pointerEvents: !!error ? 'none' : 'auto' }}
+            >
+              JPEG
+            </button>
+          </div>
+          
+          <div 
+            className="relative bg-white border border-gray-300 rounded-md p-3 overflow-auto"
+            ref={previewRef}
+            style={{ 
+              height: 'calc(100vh - 150px)',
+              minHeight: '300px',
+              maxHeight: '80vh'
+            }}
+          >
+            <MermaidRenderer 
+              key={renderKey}
+              code={mermaidText} 
+              onRender={handleRenderComplete}
+              debugMode={debugMode}
+            />
           </div>
           
           {debugMode && (
             <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-              <div>渲染器状态: {rendererStatus}</div>
-              <div>已加载iframe: {isIframeLoaded.current ? '是' : '否'}</div>
-              <div>正在加载: {isLoading ? '是' : '否'}</div>
+              <div>渲染状态: {error ? '错误' : '正常'}</div>
               <div>SVG元素存在: {svgRef.current ? '是' : '否'}</div>
               <div>错误状态: {error ? '是' : '否'}</div>
               {error && <div>错误信息: {error}</div>}
