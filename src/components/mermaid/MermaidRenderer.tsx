@@ -1,9 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { initMermaid } from '../../utils/mermaid-utils';
-
-// 确保Mermaid只初始化一次
-let initialized = false;
 
 export interface MermaidRendererProps {
   /**
@@ -28,14 +24,7 @@ export interface MermaidRendererProps {
    * 配置项
    */
   config?: {
-    /**
-     * 主题
-     */
     theme?: 'default' | 'forest' | 'dark' | 'neutral';
-    
-    /**
-     * 安全级别
-     */
     securityLevel?: 'strict' | 'loose' | 'antiscript';
   };
 }
@@ -53,67 +42,61 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const errorContainerRef = useRef<HTMLDivElement>(null);
   const [renderAttempt, setRenderAttempt] = useState(0);
+  const previousCodeRef = useRef<string>('');
 
   useEffect(() => {
-    // 初始化Mermaid (如果尚未初始化)
-    if (!initialized) {
-      initialized = initMermaid(mermaid);
-      
-      // 如果配置了主题，应用主题
-      if (config.theme) {
-        try {
-          // @ts-ignore - mermaid类型定义不完整
-          mermaid.initialize({ theme: config.theme });
-        } catch (error) {
-          console.error('设置Mermaid主题失败:', error);
-        }
-      }
-      
-      // 如果配置了安全级别，应用安全级别
-      if (config.securityLevel) {
-        try {
-          // @ts-ignore - mermaid类型定义不完整
-          mermaid.initialize({ securityLevel: config.securityLevel });
-        } catch (error) {
-          console.error('设置Mermaid安全级别失败:', error);
-        }
-      }
+    // 检测代码是否发生变化，发生变化则强制重新渲染
+    if (code !== previousCodeRef.current) {
+      previousCodeRef.current = code;
+      setRenderAttempt(prev => prev + 1);
     }
+  }, [code]);
 
+  useEffect(() => {
     // 如果没有代码，或者容器不存在，则不渲染
     if (!code.trim() || !containerRef.current) {
       return;
     }
 
-    // 清空先前的内容
-    containerRef.current.innerHTML = '';
-    
-    // 清空错误信息
-    if (errorContainerRef.current) {
-      errorContainerRef.current.innerHTML = '';
-      errorContainerRef.current.style.display = 'none';
-    }
-
-    // 创建Mermaid预处理容器
-    const mermaidContainer = document.createElement('div');
-    mermaidContainer.className = 'mermaid';
-    mermaidContainer.textContent = code;
-    containerRef.current.appendChild(mermaidContainer);
-
-    // 使用官方推荐的方式渲染Mermaid
+    // 配置Mermaid (每次渲染前都初始化，确保设置正确)
     try {
-      mermaid.run({
-        nodes: [mermaidContainer]
-      }).then((results) => {
-        // 确保results是数组且不为空
-        if (Array.isArray(results) && results.length > 0) {
-          const result = results[0];
-          // 渲染成功
-          const svgElement = result.svg ? 
-            (new DOMParser().parseFromString(result.svg, 'image/svg+xml')).documentElement : 
-            containerRef.current?.querySelector('svg');
+      // 初始化配置
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: config.theme || 'default',
+        securityLevel: config.securityLevel || 'loose',
+        logLevel: 5, // 详细日志
+        flowchart: {
+          htmlLabels: true,
+          curve: 'linear'
+        }
+      });
+      
+      // 清空先前的内容
+      containerRef.current.innerHTML = '';
+      
+      // 清空错误信息
+      if (errorContainerRef.current) {
+        errorContainerRef.current.innerHTML = '';
+        errorContainerRef.current.style.display = 'none';
+      }
+      
+      // 创建唯一ID
+      const id = `mermaid-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      
+      // 尝试直接渲染到容器
+      mermaid.render(id, code).then(({ svg, bindFunctions }) => {
+        if (containerRef.current) {
+          containerRef.current.innerHTML = svg;
           
-          if (svgElement && containerRef.current) {
+          // 如果提供了bindFunctions，应用它
+          if (typeof bindFunctions === 'function') {
+            bindFunctions(containerRef.current);
+          }
+          
+          // 获取SVG元素
+          const svgElement = containerRef.current.querySelector('svg');
+          if (svgElement) {
             // 确保SVG元素可见和可访问
             svgElement.style.maxWidth = '100%';
             svgElement.style.height = 'auto';
@@ -123,15 +106,10 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
               onRender(true, undefined, svgElement as SVGElement);
             }
           } else {
-            // SVG元素不存在，但渲染可能成功
+            console.warn('SVG元素未找到，但渲染似乎成功');
             if (onRender) {
               onRender(true);
             }
-          }
-        } else {
-          console.warn('Mermaid渲染结果异常');
-          if (onRender) {
-            onRender(true);
           }
         }
       }).catch(error => {
@@ -152,7 +130,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         }
       });
     } catch (error) {
-      console.error('Mermaid运行时错误:', error);
+      console.error('Mermaid初始化或渲染时出错:', error);
       
       // 显示错误信息
       if (errorContainerRef.current) {
@@ -168,10 +146,10 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         onRender(false, error instanceof Error ? error.message : '运行时错误');
       }
     }
-  }, [code, onRender, renderAttempt, config]);
+  }, [code, onRender, debugMode, config, renderAttempt]);
 
-  // 提供重试渲染的方法
-  const retryRender = () => {
+  // 强制重新渲染的函数
+  const forceRerender = () => {
     setRenderAttempt(prev => prev + 1);
   };
 
@@ -192,13 +170,12 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
       {debugMode && (
         <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
           <div>Mermaid代码长度: {code.length}</div>
-          <div>Mermaid初始化状态: {initialized ? '成功' : '失败'}</div>
           <div>渲染尝试次数: {renderAttempt}</div>
           <button 
-            onClick={retryRender}
-            className="mt-1 px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+            onClick={forceRerender}
+            className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
           >
-            重试渲染
+            强制重新渲染
           </button>
           <pre className="mt-1 p-1 bg-gray-100 rounded text-xs overflow-auto" style={{ maxHeight: '100px' }}>
             {code}

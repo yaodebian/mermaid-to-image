@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MermaidRenderService } from '../services/MermaidRenderService';
-import { ExportFormats } from '../types';
+// 直接定义ExportFormats类型，不需要导入
+type ExportFormats = 'svg' | 'png' | 'jpeg';
+import MermaidRenderer from '../components/mermaid/MermaidRenderer';
 
 /**
  * 转换器应用组件
@@ -10,13 +11,15 @@ const ConverterApp: React.FC = () => {
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [previewSrc, setPreviewSrc] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [isRendering, setIsRendering] = useState<boolean>(false);
   const [exportFormat, setExportFormat] = useState<ExportFormats>('svg');
   const [exportScale, setExportScale] = useState<number>(1);
   const [showTemplates, setShowTemplates] = useState<boolean>(false);
+  const [showDebug, setShowDebug] = useState<boolean>(false);
   
   const previewRef = useRef<HTMLDivElement>(null);
   const initialCodeRef = useRef<string>('');
+  const svgRef = useRef<SVGElement | null>(null);
+  const renderingLockRef = useRef<boolean>(false); // 添加渲染锁，防止重复渲染
 
   // 1. 初始化及检查URL参数
   useEffect(() => {
@@ -46,7 +49,7 @@ const ConverterApp: React.FC = () => {
     const messageListener = (message: any) => {
       if (message.type === 'SET_MERMAID_CODE' && message.code) {
         setMermaidCode(message.code);
-        renderPreview(message.code);
+        requestRenderPreview(message.code);
       }
     };
     
@@ -60,13 +63,26 @@ const ConverterApp: React.FC = () => {
   // 2. 代码变化时更新预览
   useEffect(() => {
     if (mermaidCode) {
+      // 代码变化时，立即清除错误状态和锁定，允许重新渲染
+      setError(null);
+      renderingLockRef.current = false;
+      
       const delayRender = setTimeout(() => {
-        renderPreview(mermaidCode);
+        requestRenderPreview(mermaidCode);
       }, 500);
       
       return () => clearTimeout(delayRender);
     }
-  }, [mermaidCode, exportScale]);
+  }, [mermaidCode]);
+
+  // 包装渲染函数，添加防重复渲染逻辑
+  const requestRenderPreview = (code: string) => {
+    // 如果渲染锁存在，则不触发新的渲染
+    if (renderingLockRef.current) {
+      return;
+    }
+    renderPreview(code);
+  };
   
   // 3. 预览渲染函数
   const renderPreview = async (code: string) => {
@@ -76,32 +92,41 @@ const ConverterApp: React.FC = () => {
       return;
     }
     
-    try {
-      setIsRendering(true);
+    // 设置渲染锁，避免重复渲染
+    renderingLockRef.current = true;
+  };
+  
+  // 处理渲染结果回调
+  const handleRenderComplete = (success: boolean, errorMsg?: string, svg?: SVGElement) => {
+    // 延迟释放渲染锁，防止立即触发新的渲染
+    setTimeout(() => {
+      renderingLockRef.current = false;
+    }, 100);
+    
+    if (!success) {
+      console.error('渲染失败:', errorMsg);
+      setError(errorMsg || '渲染失败');
+      setPreviewSrc('');
+      svgRef.current = null;
+    } else {
       setError(null);
       
-      const svgString = await MermaidRenderService.renderToSvg(code, {
-        scale: exportScale,
-        backgroundColor: 'white'
-      });
-      
-      // 转换SVG为Data URI
-      const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
-      const dataUri = `data:image/svg+xml;base64,${svgBase64}`;
-      setPreviewSrc(dataUri);
-    } catch (err) {
-      console.error('渲染Mermaid图表失败:', err);
-      setError('渲染失败: ' + (err instanceof Error ? err.message : String(err)));
-      setPreviewSrc('');
-    } finally {
-      setIsRendering(false);
+      if (svg) {
+        // 保存SVG引用用于导出
+        svgRef.current = svg;
+      }
     }
   };
   
   // 4. 导出函数
   const handleExport = async () => {
-    if (!mermaidCode.trim() || !previewSrc) {
+    if (!mermaidCode.trim()) {
       setError('没有可导出的内容');
+      return;
+    }
+    
+    if (!svgRef.current) {
+      setError('SVG元素未准备好，请等待渲染完成');
       return;
     }
     
@@ -110,24 +135,28 @@ const ConverterApp: React.FC = () => {
       let filename = `mermaid-diagram-${Date.now()}`;
       
       if (exportFormat === 'svg') {
-        // 直接使用SVG
-        const svgString = await MermaidRenderService.renderToSvg(mermaidCode, {
-          scale: exportScale,
-          backgroundColor: 'white'
-        });
+        // 使用引用的SVG导出
+        const svgString = new XMLSerializer().serializeToString(svgRef.current);
         const blob = new Blob([svgString], { type: 'image/svg+xml' });
         downloadUrl = URL.createObjectURL(blob);
         filename += '.svg';
+        
+        // 创建下载链接并触发
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        link.click();
+        
+        // 清理资源
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 60000);
       } else {
-        // 转换为PNG/JPEG
-        const image = new Image();
-        image.src = previewSrc;
+        // 使用引用的SVG转换为PNG/JPEG
+        // 首先，需要将SVG转换为Data URL以便图像加载
+        const svgString = new XMLSerializer().serializeToString(svgRef.current);
+        const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+        const svgDataUrl = `data:image/svg+xml;base64,${svgBase64}`;
         
-        await new Promise((resolve, reject) => {
-          image.onload = resolve;
-          image.onerror = reject;
-        });
-        
+        // 创建一个临时Canvas
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
@@ -135,8 +164,21 @@ const ConverterApp: React.FC = () => {
           throw new Error('无法创建canvas上下文');
         }
         
-        canvas.width = image.width;
-        canvas.height = image.height;
+        // 创建Image对象从SVG加载
+        const image = new Image();
+        image.src = svgDataUrl;
+        
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = reject;
+        });
+        
+        // 应用缩放因子
+        const actualWidth = Math.max(image.naturalWidth, svgRef.current.clientWidth) * exportScale;
+        const actualHeight = Math.max(image.naturalHeight, svgRef.current.clientHeight) * exportScale;
+        
+        canvas.width = actualWidth;
+        canvas.height = actualHeight;
         
         // 如果是JPEG，先填充白色背景
         if (exportFormat === 'jpeg') {
@@ -144,7 +186,8 @@ const ConverterApp: React.FC = () => {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
         
-        ctx.drawImage(image, 0, 0);
+        // 绘制图像时进行缩放
+        ctx.drawImage(image, 0, 0, actualWidth, actualHeight);
         
         // 转换为Blob并下载
         const mimeType = `image/${exportFormat}`;
@@ -173,6 +216,11 @@ const ConverterApp: React.FC = () => {
       setError('导出失败: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
+  
+  // 缩放改变时不触发重新渲染
+  useEffect(() => {
+    // 空函数，仅用于捕获exportScale变化，避免触发预览重新渲染
+  }, [exportScale]);
   
   // 5. 模板列表
   const templates = [
@@ -241,16 +289,16 @@ const ConverterApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-6">
+    <div className="min-h-screen bg-gray-100 flex flex-col" style={{ minWidth: '1024px' }}>
+      <div className="flex-grow flex flex-col">
+        <header className="py-4 px-6 bg-white shadow-sm">
           <h1 className="text-2xl font-bold text-gray-900">Mermaid图表转换器</h1>
           <p className="text-gray-600">将Mermaid代码转换为图片格式 (SVG, PNG, JPEG)</p>
         </header>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* 左侧编辑器 */}
-          <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="flex-grow flex">
+          {/* 左侧编辑器 - 固定50%宽度 */}
+          <div className="w-1/2 flex flex-col">
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">Mermaid代码</h2>
               <div className="flex space-x-2">
@@ -286,43 +334,68 @@ const ConverterApp: React.FC = () => {
               </div>
             )}
             
-            <div className="p-4">
+            <div className="flex-grow p-4 bg-white">
               <textarea
                 value={mermaidCode}
                 onChange={(e) => setMermaidCode(e.target.value)}
-                className="w-full h-80 p-3 border border-gray-300 rounded font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full h-full p-3 border border-gray-300 rounded font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="输入Mermaid语法..."
               />
             </div>
           </div>
           
-          {/* 右侧预览及导出 */}
-          <div className="bg-white shadow-md rounded-lg overflow-hidden flex flex-col">
+          {/* 右侧预览及导出 - 固定50%宽度 */}
+          <div className="w-1/2 flex flex-col border-l border-gray-200">
             <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">图表预览</h2>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center">
-                  <span className="text-sm text-gray-600 mr-2">缩放:</span>
-                  <select
-                    value={exportScale}
-                    onChange={(e) => setExportScale(Number(e.target.value))}
-                    className="text-sm border border-gray-300 rounded px-2 py-1"
+              <div className="flex items-center">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setExportScale(prev => Math.max(prev - 0.5, 0.5))}
+                    className={`p-1 rounded ${error ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                    title="缩小"
+                    disabled={!!error}
                   >
-                    <option value={1}>1x</option>
-                    <option value={2}>2x</option>
-                    <option value={3}>3x</option>
-                  </select>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                  
+                  <span className="text-sm text-gray-600">{Math.round(exportScale * 100)}%</span>
+                  
+                  <button
+                    onClick={() => setExportScale(prev => Math.min(prev + 0.5, 5))}
+                    className={`p-1 rounded ${error ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                    title="放大"
+                    disabled={!!error}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                  
+                  <button
+                    onClick={() => setExportScale(1)}
+                    className={`p-1 rounded text-xs ${error ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'hover:bg-gray-100'}`}
+                    title="重置缩放"
+                    disabled={!!error}
+                  >
+                    重置
+                  </button>
+                  
+                  <button 
+                    onClick={() => setShowDebug(!showDebug)}
+                    className={`ml-2 p-1 rounded text-xs ${showDebug ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}
+                    title="调试模式"
+                  >
+                    调试
+                  </button>
                 </div>
               </div>
             </div>
             
             <div className="flex-grow p-4 bg-gray-50 flex items-center justify-center overflow-auto" ref={previewRef}>
-              {isRendering ? (
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mb-2"></div>
-                  <p className="text-gray-600">渲染中...</p>
-                </div>
-              ) : error ? (
+              {error ? (
                 <div className="text-center p-6 max-w-md">
                   <div className="text-red-500 mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -332,12 +405,17 @@ const ConverterApp: React.FC = () => {
                   <h3 className="text-lg font-medium text-red-800">渲染错误</h3>
                   <p className="mt-2 text-sm text-red-600">{error}</p>
                 </div>
-              ) : previewSrc ? (
-                <img
-                  src={previewSrc}
-                  alt="Mermaid图表预览"
-                  className="max-w-full max-h-full object-contain"
-                />
+              ) : mermaidCode ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  {/* 将缩放直接应用到MermaidRenderer的父容器，不再使用图片预览 */}
+                  <div style={{ transform: `scale(${exportScale})`, transformOrigin: 'center', transition: 'transform 0.2s' }} className="flex items-center justify-center">
+                    <MermaidRenderer 
+                      code={mermaidCode}
+                      onRender={handleRenderComplete}
+                      debugMode={showDebug}
+                    />
+                  </div>
+                </div>
               ) : (
                 <div className="text-center p-6">
                   <p className="text-gray-500">输入Mermaid代码后将显示预览</p>
@@ -358,6 +436,7 @@ const ConverterApp: React.FC = () => {
                         value="svg"
                         checked={exportFormat === 'svg'}
                         onChange={() => setExportFormat('svg')}
+                        disabled={!!error}
                       />
                       <span className="ml-1.5 text-sm">SVG</span>
                     </label>
@@ -370,6 +449,7 @@ const ConverterApp: React.FC = () => {
                         value="png"
                         checked={exportFormat === 'png'}
                         onChange={() => setExportFormat('png')}
+                        disabled={!!error}
                       />
                       <span className="ml-1.5 text-sm">PNG</span>
                     </label>
@@ -382,6 +462,7 @@ const ConverterApp: React.FC = () => {
                         value="jpeg"
                         checked={exportFormat === 'jpeg'}
                         onChange={() => setExportFormat('jpeg')}
+                        disabled={!!error}
                       />
                       <span className="ml-1.5 text-sm">JPEG</span>
                     </label>
@@ -391,9 +472,9 @@ const ConverterApp: React.FC = () => {
               
               <button
                 onClick={handleExport}
-                disabled={!previewSrc || isRendering}
+                disabled={!!error}
                 className={`w-full py-2 rounded-md flex items-center justify-center ${
-                  !previewSrc || isRendering
+                  !!error
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
@@ -407,7 +488,7 @@ const ConverterApp: React.FC = () => {
           </div>
         </div>
         
-        <footer className="mt-8 text-center text-gray-500 text-sm">
+        <footer className="py-4 px-6 text-center text-gray-500 text-sm bg-white border-t border-gray-200">
           <p>
             <a href="https://mermaid.js.org/syntax/flowchart.html" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
               查看Mermaid语法参考
