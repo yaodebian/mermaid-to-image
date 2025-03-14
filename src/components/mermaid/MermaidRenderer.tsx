@@ -16,11 +16,6 @@ export interface MermaidRendererProps {
   onRender?: (success: boolean, error?: string, svg?: SVGElement) => void;
   
   /**
-   * 是否启用调试模式
-   */
-  debugMode?: boolean;
-  
-  /**
    * 配置项
    */
   config?: {
@@ -36,7 +31,6 @@ export interface MermaidRendererProps {
 const MermaidRenderer: React.FC<MermaidRendererProps> = ({ 
   code, 
   onRender,
-  debugMode = false,
   config = {}
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -65,10 +59,11 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         startOnLoad: false,
         theme: config.theme || 'default',
         securityLevel: config.securityLevel || 'loose',
-        logLevel: 5, // 详细日志
         flowchart: {
           htmlLabels: true,
-          curve: 'linear'
+          curve: 'linear',
+          rankSpacing: 50,
+          nodeSpacing: 50
         }
       });
       
@@ -100,6 +95,20 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
             // 确保SVG元素可见和可访问
             svgElement.style.maxWidth = '100%';
             svgElement.style.height = 'auto';
+            
+            // 隐藏节点ID - 查找并移除任何可能显示的ID
+            try {
+              const textNodes = svgElement.querySelectorAll('text.nodeLabel');
+              textNodes.forEach(node => {
+                const text = node.textContent || '';
+                if (/^\d+$/.test(text)) {
+                  // 如果节点文本只包含数字，很可能是ID，隐藏它
+                  (node as HTMLElement).style.display = 'none';
+                }
+              });
+            } catch (e) {
+              console.warn('尝试隐藏节点ID时出错:', e);
+            }
             
             // 通知父组件渲染成功
             if (onRender) {
@@ -146,12 +155,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         onRender(false, error instanceof Error ? error.message : '运行时错误');
       }
     }
-  }, [code, onRender, debugMode, config, renderAttempt]);
-
-  // 强制重新渲染的函数
-  const forceRerender = () => {
-    setRenderAttempt(prev => prev + 1);
-  };
+  }, [code, onRender, config, renderAttempt]);
 
   return (
     <div className="mermaid-renderer">
@@ -166,22 +170,6 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({
         className="mermaid-container flex justify-center items-center"
         style={{ minHeight: '100px' }}
       />
-      
-      {debugMode && (
-        <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-          <div>Mermaid代码长度: {code.length}</div>
-          <div>渲染尝试次数: {renderAttempt}</div>
-          <button 
-            onClick={forceRerender}
-            className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
-          >
-            强制重新渲染
-          </button>
-          <pre className="mt-1 p-1 bg-gray-100 rounded text-xs overflow-auto" style={{ maxHeight: '100px' }}>
-            {code}
-          </pre>
-        </div>
-      )}
     </div>
   );
 };

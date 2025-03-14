@@ -14,7 +14,6 @@ const ConverterApp: React.FC = () => {
   const [exportFormat, setExportFormat] = useState<ExportFormats>('svg');
   const [exportScale, setExportScale] = useState<number>(1);
   const [showTemplates, setShowTemplates] = useState<boolean>(false);
-  const [showDebug, setShowDebug] = useState<boolean>(false);
   
   const previewRef = useRef<HTMLDivElement>(null);
   const initialCodeRef = useRef<string>('');
@@ -382,14 +381,6 @@ const ConverterApp: React.FC = () => {
                   >
                     重置
                   </button>
-                  
-                  <button 
-                    onClick={() => setShowDebug(!showDebug)}
-                    className={`ml-2 p-1 rounded text-xs ${showDebug ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}
-                    title="调试模式"
-                  >
-                    调试
-                  </button>
                 </div>
               </div>
             </div>
@@ -412,7 +403,6 @@ const ConverterApp: React.FC = () => {
                     <MermaidRenderer 
                       code={mermaidCode}
                       onRender={handleRenderComplete}
-                      debugMode={showDebug}
                     />
                   </div>
                 </div>
