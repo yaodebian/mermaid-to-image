@@ -1,7 +1,7 @@
 import '../styles/tailwind.css';
 import { createRoot } from 'react-dom/client';
 import React from 'react';
-import { renderPreviewLayer, renderExtractLayer } from './renderUtils';
+import { MermaidExtractor } from './renderUtils';
 import { detectMermaidDiagrams } from '../services/diagram-detector';
 import { DetectionResult } from '../types/diagram';
 import { MermaidChart } from '../types';
@@ -28,12 +28,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Content script收到消息:', message);
   
   try {
-    if (message.action === 'openPreview') {
-      // 改为打开新窗口
-      openPreviewInNewTab();
-      // 发送成功响应
-      sendResponse({ success: true });
-    } else if (message.action === 'extractMermaid') {
+    if (message.action === 'extractMermaid') {
       showExtractLayer();
       // 发送成功响应
       sendResponse({ success: true });
@@ -90,75 +85,6 @@ async function handleDetectDiagrams(): Promise<DetectionResult> {
   }
 }
 
-// 在新标签页中打开预览页面
-const openPreviewInNewTab = () => {
-  console.log('在新标签页中打开预览');
-  
-  try {
-    // 获取插件中preview.html的URL
-    const previewUrl = chrome.runtime.getURL('preview.html');
-    
-    // 获取当前选中的文本，如果有的话
-    const selectedText = window.getSelection()?.toString() || '';
-    
-    // 如果有选中的文本且看起来像是Mermaid语法，则将其作为参数传递
-    let finalUrl = previewUrl;
-    if (selectedText && isMermaidSyntax(selectedText)) {
-      const encodedText = encodeURIComponent(selectedText);
-      finalUrl = `${previewUrl}?code=${encodedText}`;
-    }
-    
-    // 直接在新标签页中打开预览页面，不依赖background script
-    // 如果当前浏览器版本支持chrome.tabs.create，则使用此API
-    if (chrome.tabs && chrome.tabs.create) {
-      chrome.tabs.create({ url: finalUrl }, (tab) => {
-        console.log('已直接打开Mermaid预览标签页', tab?.id);
-      });
-    } else {
-      // 退化到使用background script打开
-      chrome.runtime.sendMessage({
-        action: 'openTab',
-        url: finalUrl
-      }, (response) => {
-        if (response && response.success) {
-          console.log('通过background script打开Mermaid预览标签页', response.tabId);
-        } else {
-          console.error('打开页面失败:', response?.error);
-        }
-      });
-    }
-    
-    console.log('预览页面打开请求已发送');
-  } catch (error) {
-    console.error('打开预览标签页时出错:', error);
-    // 尝试回退到旧方法
-    try {
-      window.open(chrome.runtime.getURL('preview.html'), '_blank');
-    } catch (e) {
-      console.error('回退方法也失败:', e);
-    }
-  }
-};
-
-// 简单判断文本是否可能是Mermaid语法
-const isMermaidSyntax = (text: string): boolean => {
-  const trimmedText = text.trim();
-  const mermaidPatterns = [
-    /^graph\s+[A-Za-z0-9_]+/i,
-    /^sequenceDiagram/i,
-    /^classDiagram/i,
-    /^stateDiagram/i,
-    /^erDiagram/i,
-    /^gantt/i,
-    /^pie/i,
-    /^flowchart\s+[A-Za-z0-9_]+/i,
-    /^journey/i,
-    /^gitGraph/i
-  ];
-  
-  return mermaidPatterns.some(pattern => pattern.test(trimmedText));
-};
-
 // 创建提取浮层
 const showExtractLayer = () => {
   // 清理已存在的浮层
@@ -175,7 +101,7 @@ const showExtractLayer = () => {
     
     // 渲染提取组件
     root.render(
-      React.createElement(renderExtractLayer, {
+      React.createElement(MermaidExtractor, {
         onClose: cleanupFloatingContainer
       })
     );
