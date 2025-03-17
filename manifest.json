@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "description": "从网页提取Mermaid图表代码并转换为图片",
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

@@ -337,14 +337,6 @@ async function detectDiagrams(): Promise<MermaidChart[]> {
     }
   }
   
-  // 如果检测到图表，通知后台
-  if (detectedCharts.length > 0) {
-    chrome.runtime.sendMessage({
-      type: 'CHARTS_DETECTED',
-      count: detectedCharts.length
-    });
-  }
-  
   return detectedCharts;
 }
 

@@ -9,12 +9,13 @@ const PopupApp: React.FC = () => {
   const handleOpenSidebar = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.runtime.sendMessage({ action: 'openSidebar' }, (response) => {
+        // 直接向内容脚本发送extractMermaid消息
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'extractMermaid' }, (response) => {
           if (response?.success) {
-            console.log('已请求打开侧边栏');
+            console.log('已请求提取Mermaid图表');
             window.close(); // 关闭弹出窗口
           } else {
-            console.error('打开侧边栏失败:', response?.error);
+            console.error('提取Mermaid图表失败:', response?.error);
           }
         });
       }

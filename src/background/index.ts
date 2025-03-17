@@ -97,11 +97,6 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
     case 'CHARTS_DETECTED':
       // 当页面检测到图表时，显示图标
       showSidebarAction();
-      // 可以在这里更新图标徽章，显示检测到的图表数量
-      if (message.count > 0 && 'action' in chrome) {
-        chrome.action.setBadgeText({ text: String(message.count) });
-        chrome.action.setBadgeBackgroundColor({ color: '#4285F4' });
-      }
       break;
       
     case 'OPEN_SIDEBAR':
@@ -146,12 +141,11 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 /**
- * 点击扩展图标时打开侧边栏
+ * 点击扩展图标时直接打开Mermaid转图片工具
  */
 chrome.action.onClicked.addListener((tab) => {
-  if (tab.id) {
-    openSidebar(tab.id);
-  }
+  // 打开Mermaid转图片工具页面
+  chrome.tabs.create({ url: chrome.runtime.getURL('converter.html') });
 });
 
 // 浏览器启动事件
