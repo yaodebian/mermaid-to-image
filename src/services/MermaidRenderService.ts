@@ -1,4 +1,42 @@
-import { RenderOptions, RenderResult } from '../types';
+/**
+ * 渲染选项类型
+ */
+interface RenderOptions {
+  /**
+   * 背景颜色
+   */
+  backgroundColor?: string;
+  
+  /**
+   * 缩放比例
+   */
+  scale?: number;
+  
+  /**
+   * 其他Mermaid配置选项
+   */
+  mermaidConfig?: Record<string, any>;
+}
+
+/**
+ * 渲染结果类型
+ */
+interface RenderResult {
+  /**
+   * 渲染后的SVG代码
+   */
+  svg: string;
+  
+  /**
+   * 是否渲染成功
+   */
+  success: boolean;
+  
+  /**
+   * 错误信息（如果渲染失败）
+   */
+  error?: string;
+}
 
 /**
  * Mermaid渲染服务

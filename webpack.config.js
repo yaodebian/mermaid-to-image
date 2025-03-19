@@ -6,12 +6,9 @@ module.exports = {
   mode: 'production',
   devtool: 'source-map',
   entry: {
-    popup: './src/popup/index.tsx',
     content: './src/content/index.ts',
     background: './src/background/index.ts',
     renderer: './src/renderer/index.jsx',
-    preview: './src/preview/index.tsx',
-    sidebar: './src/sidebar/index.tsx',
     converter: './src/converter/index.tsx'
   },
   output: {
@@ -67,27 +64,9 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: './src/popup/index.html',
-      filename: 'popup.html',
-      chunks: ['popup'],
-      inject: 'body'
-    }),
-    new HtmlWebpackPlugin({
       template: './src/renderer/template.html',
       filename: 'mermaid-renderer.html',
       chunks: ['renderer'],
-      inject: 'body'
-    }),
-    new HtmlWebpackPlugin({
-      template: './src/preview/index.html',
-      filename: 'preview.html',
-      chunks: ['preview'],
-      inject: 'body'
-    }),
-    new HtmlWebpackPlugin({
-      template: './src/sidebar/index.html',
-      filename: 'sidebar.html',
-      chunks: ['sidebar'],
       inject: 'body'
     }),
     new HtmlWebpackPlugin({

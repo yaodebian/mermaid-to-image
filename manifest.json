@@ -14,8 +14,7 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "tabs",
-    "sidePanel"
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -32,8 +31,6 @@
       "resources": [
         "mermaid-renderer.html",
         "renderer.js",
-        "preview.html",
-        "sidebar.html",
         "converter.html",
         "node_modules_*",
         "*.js",
@@ -57,8 +54,5 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
-  },
-  "side_panel": {
-    "default_path": "sidebar.html"
   }
 }
